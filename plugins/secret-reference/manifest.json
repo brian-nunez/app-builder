@@ -1,0 +1,42 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.secret-reference",
+  "version": "1.0.0",
+  "title": "Environment secret",
+  "description": "Resolve an operator-provisioned PLUGIN_SECRET_ variable without saving its value.",
+  "category": "Configuration",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "variable": {
+        "type": "string",
+        "pattern": "^PLUGIN_SECRET_[A-Z0-9_]+$",
+        "default": "PLUGIN_SECRET_SERVICE_TOKEN"
+      }
+    },
+    "required": [
+      "variable"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Value",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "permissions": [
+    "secrets.environment"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "9fd673f777d186d0efaf1f4775c05a098c87d6b97600b086c2362b8cb287dcd5"
+}

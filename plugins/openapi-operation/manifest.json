@@ -1,0 +1,91 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.openapi-operation",
+  "version": "1.0.0",
+  "title": "OpenAPI operation",
+  "description": "Invoke an operation from a pinned OpenAPI document on a shared on-premises origin.",
+  "category": "Services",
+  "kind": "action",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "base_url": {
+        "type": "string",
+        "default": "https://services.internal"
+      },
+      "operation_id": {
+        "type": "string",
+        "default": ""
+      },
+      "document": {
+        "type": "object",
+        "default": {}
+      }
+    },
+    "required": [
+      "base_url",
+      "operation_id",
+      "document"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "parameters",
+      "title": "Parameters",
+      "kind": "data",
+      "schema": {
+        "type": "object"
+      },
+      "required": false,
+      "sensitive": true
+    },
+    {
+      "name": "body",
+      "title": "Body",
+      "kind": "data",
+      "schema": {},
+      "required": false,
+      "sensitive": true
+    },
+    {
+      "name": "token",
+      "title": "Token",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": false,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "response",
+      "title": "Response",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "status",
+      "title": "Status",
+      "kind": "data",
+      "schema": {
+        "type": "integer"
+      },
+      "required": true,
+      "sensitive": false
+    }
+  ],
+  "permissions": [
+    "network.http"
+  ],
+  "logFields": [
+    "operation_id",
+    "status"
+  ],
+  "metrics": [],
+  "digest": "3a5e0440a6ffaddc976b92a7f7279f2291471875cc2ea41e05541b3448c78373"
+}

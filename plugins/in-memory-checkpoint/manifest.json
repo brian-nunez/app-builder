@@ -1,0 +1,33 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.in-memory-checkpoint",
+  "version": "1.0.0",
+  "title": "In-memory checkpoint",
+  "description": "Run-scoped LangGraph checkpoint; discarded after each agent invocation.",
+  "category": "AI resources",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "memory",
+      "title": "Memory",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": true,
+      "sensitive": true,
+      "resourceType": "memory.checkpointer/v1"
+    }
+  ],
+  "permissions": [],
+  "logFields": [],
+  "metrics": [],
+  "digest": "ddd275664c8c020baf66e60328b1ab89a95fbb7867fb40f664138c7aa0398c24"
+}

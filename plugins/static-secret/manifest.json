@@ -1,0 +1,41 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.static-secret",
+  "version": "1.0.0",
+  "title": "Static credential",
+  "description": "Supply a credential stored in encrypted node configuration. Prefer Vault for managed rotation.",
+  "category": "Configuration",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "string",
+        "title": "Secret value",
+        "default": "",
+        "writeOnly": true
+      }
+    },
+    "required": [
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Credential",
+      "kind": "data",
+      "required": true,
+      "sensitive": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "permissions": [],
+  "logFields": [],
+  "metrics": [],
+  "digest": "26300c25cf441ff3df3f89f8e1bd3c5ce032ccc5e956222e88561d6229c43cc2"
+}

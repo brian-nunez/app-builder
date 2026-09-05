@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+bin/
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
+python/.venv/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,57 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.json-field",
+  "version": "1.0.0",
+  "title": "JSON field",
+  "description": "Extract a value from a document using a JSON Pointer. Sensitive data stays protected.",
+  "category": "Data",
+  "kind": "action",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "pointer": {
+        "type": "string",
+        "title": "JSON Pointer",
+        "default": "",
+        "pattern": "^($|/)"
+      }
+    },
+    "required": [
+      "pointer"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "document",
+      "title": "Document",
+      "kind": "data",
+      "required": true,
+      "sensitive": true,
+      "schema": {}
+    }
+  ],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Value",
+      "kind": "data",
+      "required": true,
+      "sensitive": true,
+      "schema": {}
+    }
+  ],
+  "permissions": [],
+  "logFields": [
+    "value_type"
+  ],
+  "metrics": [
+    {
+      "name": "json.fields.resolved",
+      "kind": "counter",
+      "unit": "{field}",
+      "description": "Successfully resolved JSON fields"
+    }
+  ],
+  "digest": "454aeae18d84ec732eaed8659034adcd8ce588bdd1af0e18d94a582a35a67542"
+}

@@ -1,0 +1,37 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.static-config",
+  "version": "1.0.0",
+  "title": "Static configuration",
+  "description": "Expose a reusable JSON value. Use a secret reference for credentials.",
+  "category": "Configuration",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "title": "Value",
+        "default": {}
+      }
+    },
+    "required": [
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Value",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": false
+    }
+  ],
+  "permissions": [],
+  "logFields": [],
+  "metrics": [],
+  "digest": "49d79485800cbd5e08b120d5030b21a3c1b2212e207674ea042b2e7c8df17f9d"
+}

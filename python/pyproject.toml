@@ -1,0 +1,23 @@
+[project]
+name = "workflow-plugin-runtime"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "jsonschema>=4.23,<5",
+  "httpx>=0.28,<1",
+  "opentelemetry-sdk>=1.39,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.39,<2",
+  "langchain>=1.2,<2",
+  "langchain-openai>=1.1,<2",
+  "langchain-mcp-adapters>=0.2,<1",
+  "langgraph-checkpoint-postgres>=3,<4",
+  "psycopg[binary,pool]>=3.2,<4",
+]
+[project.scripts]
+workflow-worker = "workflow_sdk.server:main"
+workflow-plugin = "workflow_sdk.cli:main"
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[tool.hatch.build.targets.wheel]
+packages = ["workflow_sdk"]

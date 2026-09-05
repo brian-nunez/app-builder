@@ -1,0 +1,122 @@
+name: workflow-studio
+services:
+  postgres:
+    image: postgres:18.3-alpine3.23
+    user: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: workflow_platform
+      POSTGRES_USER: workflow
+      POSTGRES_PASSWORD: ${PLATFORM_DB_PASSWORD:?Run make configure}
+    ports:
+      - '127.0.0.1:5438:5432'
+    volumes:
+      - platform_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U workflow -d workflow_platform']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 768m
+    cpus: 1.0
+  collector:
+    build:
+      context: .
+      dockerfile: deployments/collector.Dockerfile
+    restart: unless-stopped
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes:
+      - ./deployments/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - '127.0.0.1:4317:4317'
+      - '127.0.0.1:4318:4318'
+    healthcheck:
+      test: ['CMD', '/healthcheck', 'http://127.0.0.1:13133/']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    cpus: 0.5
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+  consul:
+    image: hashicorp/consul:1.22.5
+    restart: unless-stopped
+    command: ['agent', '-server', '-bootstrap-expect=1', '-ui', '-client=0.0.0.0', '-data-dir=/consul/data']
+    ports:
+      - '127.0.0.1:8500:8500'
+    volumes:
+      - consul_data:/consul/data
+    healthcheck:
+      test: ['CMD', 'consul', 'operator', 'raft', 'list-peers']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    cpus: 0.5
+  worker:
+    build:
+      context: .
+      dockerfile: python/Dockerfile
+    restart: unless-stopped
+    environment:
+      WORKFLOW_WORKER_TOKEN: ${WORKER_TOKEN:?Run make configure}
+      WORKFLOW_ALLOWED_HOSTS: ${PLUGIN_ALLOWED_HOSTS:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_EXPORTER_OTLP_TIMEOUT: '5'
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+    ports:
+      - '127.0.0.1:8090:8090'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      collector:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8090/healthz", timeout=2)']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 128
+    read_only: true
+    tmpfs: ['/tmp:size=64m,mode=1777']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+  platform:
+    build: .
+    restart: unless-stopped
+    environment:
+      APP__SERVER__ADDRESS: '0.0.0.0:8080'
+      APP__DB__POSTGRES__HOST: postgres
+      APP__DB__POSTGRES__PORT: '5432'
+      APP__DB__POSTGRES__PASSWORD: ${PLATFORM_DB_PASSWORD:?Run make configure}
+      APP__SECURITY__ENCRYPTION_KEY: ${PLATFORM_ENCRYPTION_KEY:?Run make configure}
+      APP__SECURITY__ACCESS_TOKEN: ${PLATFORM_ACCESS_TOKEN:?Run make configure}
+      APP__SECURITY__SECURE_COOKIES: 'false'
+      APP__WORKER__ENDPOINT: http://worker:8090
+      APP__WORKER__TOKEN: ${WORKER_TOKEN:?Run make configure}
+      APP__TELEMETRY__OTLP_ENDPOINT: collector:4317
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      collector:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'healthcheck', 'http://127.0.0.1:8080/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    cpus: 1.0
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
+volumes:
+  platform_data:
+  consul_data:

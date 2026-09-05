@@ -1,0 +1,31 @@
+server:
+  address: '127.0.0.1:8080'
+  assets: 'web/dist'
+db:
+  enabled: true
+  driver: postgres
+  postgres:
+    host: '127.0.0.1'
+    port: 5438
+    user: workflow
+    dbname: workflow_platform
+    sslmode: disable
+  max_open_conns: 20
+  max_idle_conns: 5
+kv:
+  enabled: false
+telemetry:
+  enabled: true
+  service_name: workflow-platform
+  environment: local
+  enable_trace: true
+  enable_metrics: true
+  metric_mode: push
+  otlp_endpoint: '127.0.0.1:4317'
+  otlp_insecure: true
+security:
+  secure_cookies: false
+plugins:
+  directory: plugins
+worker:
+  endpoint: 'http://127.0.0.1:8090'

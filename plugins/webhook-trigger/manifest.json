@@ -1,0 +1,39 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.webhook-trigger",
+  "version": "1.0.0",
+  "title": "Inbound webhook",
+  "description": "Accept a JSON POST through a published workflow trigger binding.",
+  "category": "HTTP",
+  "kind": "trigger",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "event",
+      "title": "Event",
+      "kind": "data",
+      "schema": {},
+      "required": false,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "body",
+      "title": "Body",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "permissions": [],
+  "logFields": [],
+  "metrics": [],
+  "digest": "236dcb04b0fdf6043ccb0a766cc3225fdf4b4b332403904f1e6d2a6bfdb29310"
+}

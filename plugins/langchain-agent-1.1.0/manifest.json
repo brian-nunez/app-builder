@@ -1,0 +1,105 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.langchain-agent",
+  "version": "1.1.0",
+  "title": "LangChain agent",
+  "description": "Compose a model, optional memory, and tools into a LangChain create_agent invocation.",
+  "category": "AI",
+  "kind": "action",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "system_prompt": {
+        "type": "string",
+        "default": "You are a helpful assistant."
+      },
+      "thread_id": {
+        "type": "string",
+        "default": ""
+      },
+      "recursion_limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 25
+      }
+    },
+    "required": [
+      "system_prompt",
+      "thread_id",
+      "recursion_limit"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "prompt",
+      "title": "Prompt",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "model",
+      "title": "Model",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": true,
+      "sensitive": true,
+      "resourceType": "ai.chat-model/v1"
+    },
+    {
+      "name": "memory",
+      "title": "Memory",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": false,
+      "sensitive": true,
+      "resourceType": "memory.checkpointer/v1"
+    },
+    {
+      "name": "tools",
+      "title": "Tools",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": false,
+      "sensitive": true,
+      "resourceType": "ai.tools/v1",
+      "multiple": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "response",
+      "title": "Response",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "permissions": [],
+  "logFields": [
+    "message_count"
+  ],
+  "metrics": [
+    {
+      "name": "agent.messages",
+      "kind": "counter",
+      "unit": "{message}",
+      "description": "Messages produced or consumed by an agent invocation"
+    }
+  ],
+  "digest": "862cb4c5f8eb03df1410c5630a1a3cfd3ecfb0649d83acfa52e69a825e1d3f52"
+}

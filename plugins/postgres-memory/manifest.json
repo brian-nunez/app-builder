@@ -1,0 +1,111 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.postgres-memory",
+  "version": "1.0.0",
+  "title": "PostgreSQL memory",
+  "description": "Provide an agent checkpointer using a separate, explicitly connected PostgreSQL database.",
+  "category": "AI resources",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "default": "default"
+      },
+      "initialize": {
+        "type": "boolean",
+        "default": false
+      },
+      "sslmode": {
+        "type": "string",
+        "enum": [
+          "verify-full",
+          "verify-ca",
+          "require",
+          "disable"
+        ],
+        "default": "verify-full"
+      }
+    },
+    "required": [
+      "namespace",
+      "initialize",
+      "sslmode"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "host",
+      "title": "Host",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "port",
+      "title": "Port",
+      "kind": "data",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "required": false,
+      "sensitive": true
+    },
+    {
+      "name": "database",
+      "title": "Database",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "username",
+      "title": "Username",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "password",
+      "title": "Password",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "memory",
+      "title": "Memory",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": true,
+      "sensitive": true,
+      "resourceType": "memory.checkpointer/v1"
+    }
+  ],
+  "permissions": [
+    "network.postgres"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "d6fe6360773af660cf185fa895bc9e3dbc78d9f20252238018c3255975ec712d"
+}

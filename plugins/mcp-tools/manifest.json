@@ -1,0 +1,58 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.mcp-tools",
+  "version": "1.0.0",
+  "title": "MCP tools",
+  "description": "Provide tools from an approved streamable HTTP MCP server.",
+  "category": "AI resources",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "default": "https://mcp.internal/mcp"
+      },
+      "server_name": {
+        "type": "string",
+        "default": "tools"
+      }
+    },
+    "required": [
+      "url",
+      "server_name"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "token",
+      "title": "Token",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": false,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "tools",
+      "title": "Tools",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": true,
+      "sensitive": true,
+      "resourceType": "ai.tools/v1"
+    }
+  ],
+  "permissions": [
+    "network.http"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "2d900238874e43b5afb2d73b4e8933b3be79ddbd03a47aabc5cb8c66e57eebfb"
+}

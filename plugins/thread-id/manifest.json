@@ -1,0 +1,52 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.thread-id",
+  "version": "1.0.0",
+  "title": "Thread ID",
+  "description": "Preserve a supplied thread ID or generate a UUIDv7 when the field is absent.",
+  "category": "Data",
+  "kind": "action",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "field": {
+        "type": "string",
+        "minLength": 1,
+        "default": "thread_id"
+      }
+    },
+    "required": [
+      "field"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "document",
+      "title": "Document",
+      "kind": "data",
+      "required": true,
+      "sensitive": true,
+      "schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Thread ID",
+      "kind": "data",
+      "required": true,
+      "sensitive": true,
+      "schema": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  ],
+  "permissions": [],
+  "logFields": [],
+  "metrics": [],
+  "digest": "1db07d2d6af03d9f39d7434a16e1409f7cd643a2592e4f109bc5e58a6a40c127"
+}

@@ -1,0 +1,8 @@
+.git
+.env
+.env.*
+web/node_modules
+web/dist
+python/.venv
+**/__pycache__
+bin

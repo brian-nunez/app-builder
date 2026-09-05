@@ -1,0 +1,71 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.http-request-tools",
+  "version": "1.2.0",
+  "title": "HTTP request tools",
+  "description": "Provide HTTP tools for a configured service and explicitly allowed additional origins.",
+  "category": "AI resources",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "base_url": {
+        "type": "string",
+        "default": "http://consul:8500"
+      },
+      "methods": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD"
+          ]
+        },
+        "minItems": 1,
+        "uniqueItems": true,
+        "default": [
+          "GET"
+        ]
+      },
+      "allowed_origins": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true,
+        "default": []
+      }
+    },
+    "required": [
+      "base_url",
+      "methods",
+      "allowed_origins"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "tools",
+      "title": "Tools",
+      "kind": "resource",
+      "schema": {
+        "type": "object"
+      },
+      "required": true,
+      "sensitive": true,
+      "resourceType": "ai.tools/v1"
+    }
+  ],
+  "permissions": [
+    "network.http"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "18572823b3dd0e335ab1f3fd5e5d31d2923b141a259b1484e18fb6183054bb5f"
+}

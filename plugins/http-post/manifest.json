@@ -1,0 +1,68 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.http-post",
+  "version": "1.0.0",
+  "title": "HTTP POST",
+  "description": "Send a JSON payload to an explicitly configured endpoint.",
+  "category": "HTTP",
+  "kind": "action",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "default": "https://service.internal/events"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "body",
+      "title": "Body",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "token",
+      "title": "Token",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": false,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "response",
+      "title": "Response",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "name": "status",
+      "title": "Status",
+      "kind": "data",
+      "schema": {
+        "type": "integer"
+      },
+      "required": true,
+      "sensitive": false
+    }
+  ],
+  "permissions": [
+    "network.http"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "220ee1668d00a09a21ecdf7faeb3ae8d0695dc3f41e48322edff0347ccb032a8"
+}

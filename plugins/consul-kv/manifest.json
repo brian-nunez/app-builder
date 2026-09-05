@@ -1,0 +1,60 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.consul-kv",
+  "version": "1.0.0",
+  "title": "Consul key/value",
+  "description": "Resolve a configuration key from an explicitly configured Consul service.",
+  "category": "Configuration",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "default": "https://consul.internal"
+      },
+      "key": {
+        "type": "string",
+        "default": "services/app/config"
+      },
+      "parse_json": {
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "required": [
+      "url",
+      "key",
+      "parse_json"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "token",
+      "title": "Token",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": false,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Value",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "permissions": [
+    "network.http"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "b3536aa809e186f99e709e21b2b89732d87ba6d656a722cfc5afea02df16a0cf"
+}

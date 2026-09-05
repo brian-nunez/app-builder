@@ -1,0 +1,65 @@
+{
+  "protocol": "workflow.plugin/v1",
+  "name": "community.vault-kv",
+  "version": "1.0.0",
+  "title": "Vault KV",
+  "description": "Read one field from a HashiCorp Vault KV v2 secret.",
+  "category": "Configuration",
+  "kind": "resource",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "default": "https://vault.internal"
+      },
+      "mount": {
+        "type": "string",
+        "default": "secret"
+      },
+      "path": {
+        "type": "string",
+        "default": "services/app"
+      },
+      "field": {
+        "type": "string",
+        "default": "password"
+      }
+    },
+    "required": [
+      "url",
+      "mount",
+      "path",
+      "field"
+    ],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "token",
+      "title": "Token",
+      "kind": "data",
+      "schema": {
+        "type": "string"
+      },
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "value",
+      "title": "Value",
+      "kind": "data",
+      "schema": {},
+      "required": true,
+      "sensitive": true
+    }
+  ],
+  "permissions": [
+    "network.http"
+  ],
+  "logFields": [],
+  "metrics": [],
+  "digest": "4325b50fab6be109c3b995656804a81d682431ddd9fec3c7609ecdb5aeb2591b"
+}
