@@ -2,6 +2,10 @@
 
 A Go-served Vite/React workflow editor with PostgreSQL 18 state, immutable revision history, and independently packaged Python plugins. Adapted from Brian's local BKit API template; uses bconfig, bsuite/bdb, brun, baccess, and btelemetry. No integration is compiled into the platform.
 
+## Workflow View
+
+![UI View](./docs/flow.png)
+
 ## Run locally
 
 ```sh
