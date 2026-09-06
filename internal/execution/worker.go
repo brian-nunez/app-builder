@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/brian-nunez/app-builder/internal/platform"
 	"github.com/brian-nunez/app-builder/sdk/go/plugin"
@@ -17,6 +18,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -25,37 +27,69 @@ type Worker struct {
 	Store           *platform.Store
 	Endpoint, Token string
 	Client          *http.Client
+	// Capacity is the number of concurrent invocations the plugin worker accepts.
+	// It is read from the worker's own /catalog report so the limit has one owner.
+	Capacity int
+
+	slots chan struct{}
+	runs  chan struct{}
+}
+
+// Start prepares the scheduler's admission limits from the worker's capacity.
+func (w *Worker) Start() {
+	if w.Capacity < 1 {
+		w.Capacity = 1
+	}
+	w.slots = make(chan struct{}, w.Capacity)
+	w.runs = make(chan struct{}, w.Capacity)
 }
 
 func (w *Worker) Run(ctx context.Context) error {
+	if w.slots == nil {
+		w.Start()
+	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			for {
+			// Claim only what this replica has room to run. Pulling the whole queue
+			// into goroutines that then queue again downstream is not backpressure.
+			for w.reserve() {
 				r, err := w.Store.Claim(ctx)
-				if platform.IsMissing(err) {
-					break
-				}
 				if err != nil {
-					slog.ErrorContext(ctx, "claim failed", "error", err)
+					w.release()
+					if !platform.IsMissing(err) {
+						slog.ErrorContext(ctx, "claim failed", "error", err)
+					}
 					break
 				}
 				wg.Add(1)
 				go func(run platform.Run) {
 					defer wg.Done()
+					defer w.release()
 					w.execute(ctx, run)
 				}(r)
 			}
 		}
 	}
 }
+
+func (w *Worker) reserve() bool {
+	select {
+	case w.runs <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (w *Worker) release() { <-w.runs }
 func (w *Worker) execute(parent context.Context, r platform.Run) {
 	ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 	defer cancel()
@@ -142,9 +176,6 @@ func (w *Worker) graph(ctx context.Context, r platform.Run) (map[string]any, boo
 		}
 		errMu.Unlock()
 	}
-	
-	// The Python worker has a bounded semaphore of 4 slots.
-	sem := make(chan struct{}, 4)
 
 	for _, id := range order {
 		id := id // capture loop variable
@@ -177,12 +208,12 @@ func (w *Worker) graph(ctx context.Context, r platform.Run) (map[string]any, boo
 			if cacheErr != nil && !platform.IsMissing(cacheErr) {
 				return fmt.Errorf("cannot load step checkpoint")
 			}
-			
+
 			inputs := map[string]any{}
 			if m.Kind == "trigger" {
 				inputs["event"] = triggerInput
 			}
-			
+
 			outputsMu.Lock()
 			for _, e := range revision.Graph.Edges {
 				if e.Target == id {
@@ -226,15 +257,13 @@ func (w *Worker) graph(ctx context.Context, r platform.Run) (map[string]any, boo
 					}
 				}
 			}
-			
+
 			if err := w.Store.StartStep(egCtx, r, id); err != nil {
 				return err
 			}
-			
-			sem <- struct{}{}
-			result, callErr := w.invoke(egCtx, r, revision.Name, n, m, inputs)
-			<-sem
-			
+
+			result, callErr := w.call(egCtx, r, revision.Name, n, m, inputs)
+
 			if callErr != nil {
 				if err := w.Store.EndStep(egCtx, r, id, "failed", nil, "worker communication failed"); err != nil {
 					return err
@@ -279,19 +308,60 @@ func (w *Worker) graph(ctx context.Context, r platform.Run) (map[string]any, boo
 			if err := w.Store.EndStep(egCtx, r, id, "succeeded", result.Outputs, ""); err != nil {
 				return err
 			}
-			
+
 			outputsMu.Lock()
 			outputs[id] = result.Outputs
 			outputsMu.Unlock()
 			return nil
 		})
 	}
-	
+
 	if err := eg.Wait(); err != nil {
 		return nil, isRetryable, err
 	}
 	return outputs, false, nil
 }
+
+// busy reports that the plugin worker is at capacity and asked the caller to wait.
+type busy struct{ after time.Duration }
+
+func (b busy) Error() string { return "plugin worker at capacity" }
+
+func retryAfter(header string) time.Duration {
+	if seconds, err := strconv.Atoi(header); err == nil && seconds > 0 && seconds <= 60 {
+		return time.Duration(seconds) * time.Second
+	}
+	return time.Second
+}
+
+// call runs one node against the plugin worker, holding a slot from the shared
+// pool for the duration and waiting out backpressure instead of failing on it.
+func (w *Worker) call(ctx context.Context, r platform.Run, name string, n plugin.Node, m plugin.Manifest, inputs map[string]any) (plugin.Response, error) {
+	for attempt := 0; ; attempt++ {
+		select {
+		case w.slots <- struct{}{}:
+		case <-ctx.Done():
+			return plugin.Response{}, ctx.Err()
+		}
+		result, err := w.invoke(ctx, r, name, n, m, inputs)
+		<-w.slots
+		var saturated busy
+		if !errors.As(err, &saturated) {
+			return result, err
+		}
+		if attempt >= maxBusyRetries {
+			return plugin.Response{}, fmt.Errorf("plugin worker stayed at capacity")
+		}
+		select {
+		case <-ctx.Done():
+			return plugin.Response{}, ctx.Err()
+		case <-time.After(saturated.after):
+		}
+	}
+}
+
+const maxBusyRetries = 60
+
 func (w *Worker) invoke(ctx context.Context, r platform.Run, name string, n plugin.Node, m plugin.Manifest, inputs map[string]any) (plugin.Response, error) {
 	attrs := []attribute.KeyValue{attribute.String("workflow.name", name), attribute.String("plugin.name", m.Name), attribute.String("plugin.version", m.Version)}
 	ctx, span := otel.Tracer("workflow.plugins").Start(ctx, "plugin.execute", trace.WithAttributes(append(attrs, attribute.String("workflow.run.id", r.ID), attribute.String("workflow.node.id", n.ID), attribute.String("workflow.node.name", n.Name), attribute.Int("workflow.attempt", r.Attempt))...))
@@ -319,6 +389,11 @@ func (w *Worker) invoke(ctx context.Context, r platform.Run, name string, n plug
 		return plugin.Response{}, err
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusServiceUnavailable {
+		// The worker is saturated. That is backpressure, not a failure: wait for
+		// the interval it asked for and let the caller try this node again.
+		return plugin.Response{}, busy{after: retryAfter(response.Header.Get("Retry-After"))}
+	}
 	if response.StatusCode != 200 {
 		return plugin.Response{}, fmt.Errorf("worker status %d", response.StatusCode)
 	}

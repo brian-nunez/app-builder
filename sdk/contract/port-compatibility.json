@@ -1,0 +1,103 @@
+{
+  "description": "Cases every implementation of port compatibility must agree on. The Go platform decides whether a saved graph is valid; the canvas decides what a user is allowed to draw. Both read this file in their tests so the two cannot drift apart silently.",
+  "connection": [
+    {
+      "name": "untyped data ports connect",
+      "output": { "kind": "data", "schema": {} },
+      "input": { "kind": "data", "schema": {} },
+      "connectable": true
+    },
+    {
+      "name": "matching data types connect",
+      "output": { "kind": "data", "schema": { "type": "string" } },
+      "input": { "kind": "data", "schema": { "type": "string" } },
+      "connectable": true
+    },
+    {
+      "name": "conflicting data types do not connect",
+      "output": { "kind": "data", "schema": { "type": "string" } },
+      "input": { "kind": "data", "schema": { "type": "integer" } },
+      "connectable": false
+    },
+    {
+      "name": "a typed output feeds an untyped input",
+      "output": { "kind": "data", "schema": { "type": "object" } },
+      "input": { "kind": "data", "schema": {} },
+      "connectable": true
+    },
+    {
+      "name": "an untyped output feeds a typed input",
+      "output": { "kind": "data", "schema": {} },
+      "input": { "kind": "data", "schema": { "type": "object" } },
+      "connectable": true
+    },
+    {
+      "name": "data does not connect to a resource port",
+      "output": { "kind": "data", "schema": { "type": "object" } },
+      "input": { "kind": "resource", "resourceType": "ai.tools/v1", "schema": { "type": "object" } },
+      "connectable": false
+    },
+    {
+      "name": "a resource does not connect to a data port",
+      "output": { "kind": "resource", "resourceType": "ai.tools/v1", "schema": { "type": "object" } },
+      "input": { "kind": "data", "schema": { "type": "object" } },
+      "connectable": false
+    },
+    {
+      "name": "matching resource contracts connect",
+      "output": { "kind": "resource", "resourceType": "ai.chat-model/v1", "schema": { "type": "object" } },
+      "input": { "kind": "resource", "resourceType": "ai.chat-model/v1", "schema": { "type": "object" } },
+      "connectable": true
+    },
+    {
+      "name": "different resource contracts do not connect",
+      "output": { "kind": "resource", "resourceType": "ai.chat-model/v1", "schema": { "type": "object" } },
+      "input": { "kind": "resource", "resourceType": "memory.checkpointer/v1", "schema": { "type": "object" } },
+      "connectable": false
+    },
+    {
+      "name": "a sensitive output requires a sensitive input",
+      "output": { "kind": "data", "sensitive": true, "schema": { "type": "string" } },
+      "input": { "kind": "data", "schema": { "type": "string" } },
+      "connectable": false
+    },
+    {
+      "name": "a sensitive output feeds a sensitive input",
+      "output": { "kind": "data", "sensitive": true, "schema": { "type": "string" } },
+      "input": { "kind": "data", "sensitive": true, "schema": { "type": "string" } },
+      "connectable": true
+    },
+    {
+      "name": "an ordinary output feeds a sensitive input",
+      "output": { "kind": "data", "schema": { "type": "string" } },
+      "input": { "kind": "data", "sensitive": true, "schema": { "type": "string" } },
+      "connectable": true
+    }
+  ],
+  "arity": [
+    {
+      "name": "the first source binds an input",
+      "multiple": false,
+      "bound": 0,
+      "connectable": true
+    },
+    {
+      "name": "a second source replaces rather than joins a single input",
+      "multiple": false,
+      "bound": 1,
+      "connectable": false
+    },
+    {
+      "name": "a multiple input accepts a second source",
+      "multiple": true,
+      "bound": 1,
+      "connectable": true
+    },
+    {
+      "name": "a multiple input accepts further sources",
+      "multiple": true,
+      "bound": 3,
+      "connectable": true
+    }
+  ]
+}

@@ -9,7 +9,8 @@ import (
 
 const Protocol = "workflow.plugin/v1"
 
-type Schema = map[string]any
+// Schema is a JSON Schema fragment describing a port or configuration value.
+type Schema map[string]any
 
 type Port struct {
 	Side         string `json:"side,omitempty"`

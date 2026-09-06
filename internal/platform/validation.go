@@ -28,7 +28,7 @@ func ValidateGraph(g plugin.Graph, catalog map[string]plugin.Manifest, complete 
 	nodes := map[string]plugin.Node{}
 	degree := map[string]int{}
 	adj := map[string][]string{}
-	bound := map[string]bool{}
+	bound := map[string]int{}
 	edgeIDs := map[string]bool{}
 	connections := map[string]bool{}
 	for _, n := range g.Nodes {
@@ -109,22 +109,14 @@ func ValidateGraph(g plugin.Graph, catalog map[string]plugin.Manifest, complete 
 		if out == nil || in == nil {
 			return nil, fmt.Errorf("unknown port")
 		}
-		if out.Kind != in.Kind || out.ResourceType != in.ResourceType {
-			return nil, fmt.Errorf("incompatible connection types")
-		}
-		if out.Sensitive && !in.Sensitive {
-			return nil, fmt.Errorf("sensitive output requires a sensitive input")
-		}
-		if ot, ok := out.Schema["type"].(string); ok {
-			if it, ok := in.Schema["type"].(string); ok && ot != it {
-				return nil, fmt.Errorf("incompatible data types")
-			}
+		if err := plugin.Connectable(*out, *in); err != nil {
+			return nil, err
 		}
 		key := e.Target + ":" + e.TargetPort
-		if bound[key] && !in.Multiple {
+		if !plugin.AcceptsAnother(*in, bound[key]) {
 			return nil, fmt.Errorf("input already connected")
 		}
-		bound[key] = true
+		bound[key]++
 		degree[e.Target]++
 		adj[e.Source] = append(adj[e.Source], e.Target)
 	}
@@ -135,7 +127,7 @@ func ValidateGraph(g plugin.Graph, catalog map[string]plugin.Manifest, complete 
 				if manifest.Kind == "trigger" && p.Name == "event" {
 					continue
 				}
-				if p.Required && !bound[n.ID+":"+p.Name] {
+				if p.Required && bound[n.ID+":"+p.Name] == 0 {
 					return nil, fmt.Errorf("%s requires input %s", n.Name, p.Title)
 				}
 			}

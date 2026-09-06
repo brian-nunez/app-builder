@@ -2,13 +2,17 @@ package platform
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/brian-nunez/app-builder/sdk/go/plugin"
 	"github.com/brian-nunez/bdb"
 	"github.com/google/uuid"
+	"log/slog"
 )
 
 //go:embed schema.sql
@@ -70,6 +74,18 @@ func (s *Store) Catalog(ctx context.Context) (map[string]plugin.Manifest, error)
 	}
 	return out, rows.Err()
 }
+
+// ErrPinnedContract reports a plugin release whose declared contract changed
+// while a saved revision still pins it.
+var ErrPinnedContract = errors.New("plugin contract changed for a version pinned by a saved revision")
+
+// Register installs one plugin release.
+//
+// A version that no saved revision references may be refreshed freely, which is
+// what makes local iteration comfortable. Once a revision pins a version, its
+// contract is frozen: changing ports or schemas underneath a saved workflow would
+// silently alter what that workflow does, so it is refused. Rebuilding the same
+// contract from changed source is allowed and only moves the digest.
 func (s *Store) Register(ctx context.Context, m plugin.Manifest) error {
 	if err := m.Validate(); err != nil {
 		return err
@@ -77,7 +93,54 @@ func (s *Store) Register(ctx context.Context, m plugin.Manifest) error {
 	if err := compileManifest(m); err != nil {
 		return err
 	}
-	_, err := s.DB.Exec(ctx, "INSERT INTO plugin_versions(name,version,manifest) VALUES($1,$2,$3) ON CONFLICT(name,version) DO UPDATE SET manifest=EXCLUDED.manifest,created_at=now()", m.Name, m.Version, string(JSON(m)))
+	var raw []byte
+	err := s.DB.QueryOne(ctx, "SELECT manifest FROM plugin_versions WHERE name=$1 AND version=$2", []any{m.Name, m.Version}, &raw)
+	if err != nil && !IsMissing(err) {
+		return err
+	}
+	if err == nil {
+		var existing plugin.Manifest
+		if err = json.Unmarshal(raw, &existing); err != nil {
+			return err
+		}
+		if existing.Contract() == m.Contract() {
+			if existing.Digest == m.Digest {
+				return nil
+			}
+			slog.WarnContext(ctx, "plugin artifact rebuilt", "plugin", m.Key(), "digest", m.Digest)
+		} else {
+			pinned, err := s.versionPinned(ctx, m.Name, m.Version)
+			if err != nil {
+				return err
+			}
+			if pinned {
+				return fmt.Errorf("%w: %s; publish the change as a new version", ErrPinnedContract, m.Key())
+			}
+			slog.WarnContext(ctx, "plugin contract replaced", "plugin", m.Key())
+		}
+	}
+	_, err = s.DB.Exec(ctx, "INSERT INTO plugin_versions(name,version,manifest) VALUES($1,$2,$3) ON CONFLICT(name,version) DO UPDATE SET manifest=EXCLUDED.manifest,created_at=now()", m.Name, m.Version, string(JSON(m)))
+	return err
+}
+
+func (s *Store) versionPinned(ctx context.Context, name, version string) (bool, error) {
+	var pinned bool
+	err := s.DB.QueryOne(ctx, `SELECT EXISTS(SELECT 1 FROM revisions r CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.graph->'nodes','[]'::jsonb)) node WHERE node->>'plugin'=$1 AND node->>'version'=$2)`, []any{name, version}, &pinned)
+	return pinned, err
+}
+
+// Uninstall removes a plugin release that is no longer present on disk. A release
+// pinned by a saved revision is kept so that revision stays readable.
+func (s *Store) Uninstall(ctx context.Context, name, version string) error {
+	pinned, err := s.versionPinned(ctx, name, version)
+	if err != nil {
+		return err
+	}
+	if pinned {
+		slog.WarnContext(ctx, "installed plugin missing but pinned by a saved revision", "plugin", name+"@"+version)
+		return nil
+	}
+	_, err = s.DB.Exec(ctx, "DELETE FROM plugin_versions WHERE name=$1 AND version=$2", name, version)
 	return err
 }
 func (s *Store) List(ctx context.Context) ([]Workflow, error) {
@@ -383,3 +446,114 @@ func (s *Store) Cancel(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 func IsMissing(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+
+type Step struct {
+	NodeID     string  `json:"nodeId"`
+	Attempt    int     `json:"attempt"`
+	Status     string  `json:"status"`
+	Error      *string `json:"error"`
+	StartedAt  string  `json:"startedAt"`
+	FinishedAt *string `json:"finishedAt"`
+}
+
+// Binding is a published inbound endpoint for one trigger node.
+type Binding struct {
+	ID         string  `json:"id"`
+	NodeID     string  `json:"nodeId"`
+	Mode       string  `json:"mode"`
+	Path       string  `json:"path"`
+	Token      string  `json:"token"`
+	RunID      *string `json:"runId"`
+	ReceivedAt *string `json:"receivedAt"`
+}
+
+func (s *Store) Steps(ctx context.Context, runID string) ([]Step, error) {
+	rows, err := s.DB.Query(ctx, "SELECT node_id,attempt,status,error,started_at::text,finished_at::text FROM steps WHERE run_id=$1 ORDER BY started_at", runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Step{}
+	for rows.Next() {
+		var step Step
+		if err = rows.Scan(&step.NodeID, &step.Attempt, &step.Status, &step.Error, &step.StartedAt, &step.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, step)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) Bindings(ctx context.Context, workflowID string) ([]Binding, error) {
+	rows, err := s.DB.Query(ctx, "SELECT id,node_id,mode,token_cipher,last_run_id::text,received_at::text FROM trigger_bindings WHERE workflow_id=$1 ORDER BY created_at DESC", workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Binding{}
+	for rows.Next() {
+		var binding Binding
+		var sealed []byte
+		if err = rows.Scan(&binding.ID, &binding.NodeID, &binding.Mode, &sealed, &binding.RunID, &binding.ReceivedAt); err != nil {
+			return nil, err
+		}
+		if len(sealed) > 0 {
+			// Endpoints created before tokens were retained keep only their hash.
+			if err = s.Cipher.Open(sealed, "binding:"+binding.ID, &binding.Token); err != nil {
+				return nil, err
+			}
+		}
+		binding.Path = "/hooks/" + binding.ID
+		out = append(out, binding)
+	}
+	return out, rows.Err()
+}
+
+// CreateBinding issues an inbound endpoint and its bearer token.
+func (s *Store) CreateBinding(ctx context.Context, workflowID, nodeID, mode, token string) (Binding, error) {
+	id := uuid.NewString()
+	sealed, err := s.Cipher.Seal(token, "binding:"+id)
+	if err != nil {
+		return Binding{}, err
+	}
+	_, err = s.DB.Exec(ctx, "INSERT INTO trigger_bindings(id,workflow_id,node_id,token_hash,mode,token_cipher) VALUES($1,$2,$3,$4,$5,$6)", id, workflowID, nodeID, TokenHash(token), mode, sealed)
+	if err != nil {
+		return Binding{}, err
+	}
+	return Binding{ID: id, NodeID: nodeID, Mode: mode, Path: "/hooks/" + id, Token: token}, nil
+}
+
+// Endpoint is a trigger binding resolved to the revision it currently targets.
+type Endpoint struct {
+	WorkflowID string
+	NodeID     string
+	TokenHash  string
+	Revision   *int
+}
+
+func (s *Store) Endpoint(ctx context.Context, bindingID string) (Endpoint, error) {
+	var e Endpoint
+	err := s.DB.QueryOne(ctx, "SELECT b.workflow_id,b.node_id,b.token_hash,CASE WHEN b.mode='draft' THEN w.head ELSE w.published END FROM trigger_bindings b JOIN workflows w ON w.id=b.workflow_id WHERE b.id=$1", []any{bindingID}, &e.WorkflowID, &e.NodeID, &e.TokenHash, &e.Revision)
+	return e, err
+}
+
+func (s *Store) RecordBindingRun(ctx context.Context, bindingID, runID string) error {
+	_, err := s.DB.Exec(ctx, "UPDATE trigger_bindings SET last_run_id=$2,received_at=now() WHERE id=$1", bindingID, runID)
+	return err
+}
+
+// RunOutcome is the part of a run a webhook caller is allowed to observe.
+type RunOutcome struct {
+	Status   string
+	Revision int
+	Output   []byte
+}
+
+func (s *Store) RunOutcome(ctx context.Context, runID, workflowID string) (RunOutcome, error) {
+	var outcome RunOutcome
+	err := s.DB.QueryOne(ctx, "SELECT status,revision,output FROM runs WHERE id=$1 AND workflow_id=$2", []any{runID, workflowID}, &outcome.Status, &outcome.Revision, &outcome.Output)
+	return outcome, err
+}
+
+// TokenHash is the stored form of an inbound endpoint's bearer token.
+func TokenHash(v string) string { h := sha256.Sum256([]byte(v)); return hex.EncodeToString(h[:]) }

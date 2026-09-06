@@ -165,18 +165,18 @@ class Context:
 
     @contextlib.asynccontextmanager
     async def resolve(self, descriptor):
-        import importlib.util
-        from .registry import catalog
+        from .registry import ArtifactError, load_module, resolve
         if descriptor.get('protocol') != 'workflow.resource/v1':
             raise PluginError('invalid_resource_protocol')
-        manifest, directory = catalog(os.environ['WORKFLOW_PLUGIN_ROOT'])[(descriptor['plugin'], descriptor['version'])]
+        try:
+            manifest, directory = resolve(os.environ['WORKFLOW_PLUGIN_ROOT'], descriptor['plugin'], descriptor['version'])
+        except ArtifactError:
+            raise PluginError('resource_artifact_mismatch') from None
         if descriptor['digest'] != manifest['digest']:
             raise PluginError('resource_artifact_mismatch')
         if not any(p.get('resourceType') == descriptor['type'] for p in manifest['outputs']):
             raise PluginError('undeclared_resource_type')
-        spec = importlib.util.spec_from_file_location('resource_plugin', directory / 'plugin.py')
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = load_module(directory, 'resource_plugin')
         request = {'config': {}, 'inputs': {}, 'context': self.execution, 'logFields': []}
         provider_context = Context(request, manifest, self._logger)
         provider_context._collect_secrets(descriptor['value'])

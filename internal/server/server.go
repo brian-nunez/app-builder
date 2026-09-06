@@ -10,7 +10,6 @@ import (
 	"github.com/brian-nunez/app-builder/sdk/go/plugin"
 	"github.com/brian-nunez/bhttp/pkg/bsuite"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/oauth2"
@@ -448,30 +447,22 @@ func (s *Server) bind(w http.ResponseWriter, r *http.Request) {
 		fail(w, fmt.Errorf("node is not a published trigger"))
 		return
 	}
-	id := uuid.NewString()
-	token := randomToken()
-	sealed, err := s.store.Cipher.Seal(token, "binding:"+id)
+	binding, err := s.store.CreateBinding(r.Context(), item.ID, body.NodeID, body.Mode, randomToken())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	_, err = s.store.DB.Exec(r.Context(), "INSERT INTO trigger_bindings(id,workflow_id,node_id,token_hash,mode,token_cipher) VALUES($1,$2,$3,$4,$5,$6)", id, item.ID, body.NodeID, tokenHash(token), body.Mode, sealed)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	respond(w, 201, map[string]string{"id": id, "nodeId": body.NodeID, "mode": body.Mode, "path": "/hooks/" + id, "token": token})
+	respond(w, 201, binding)
 }
 func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
-	var workflowID, nodeID, hash string
-	var revision *int
-	err := s.store.DB.QueryOne(r.Context(), "SELECT b.workflow_id,b.node_id,b.token_hash,CASE WHEN b.mode='draft' THEN w.head ELSE w.published END FROM trigger_bindings b JOIN workflows w ON w.id=b.workflow_id WHERE b.id=$1", []any{r.PathValue("id")}, &workflowID, &nodeID, &hash, &revision)
+	endpoint, err := s.store.Endpoint(r.Context(), r.PathValue("id"))
 	if err != nil {
 		respond(w, 404, map[string]string{"error": "Webhook endpoint not found"})
 		return
 	}
-	provided := tokenHash(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-	if subtle.ConstantTimeCompare([]byte(hash), []byte(provided)) != 1 {
+	workflowID, nodeID, revision := endpoint.WorkflowID, endpoint.NodeID, endpoint.Revision
+	provided := platform.TokenHash(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	if subtle.ConstantTimeCompare([]byte(endpoint.TokenHash), []byte(provided)) != 1 {
 		respond(w, 401, map[string]string{"error": "Missing or invalid bearer token. Copy the curl command from the webhook settings."})
 		return
 	}
@@ -516,7 +507,7 @@ func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if _, err = s.store.DB.Exec(r.Context(), "UPDATE trigger_bindings SET last_run_id=$2,received_at=now() WHERE id=$1", r.PathValue("id"), id); err != nil {
+	if err = s.store.RecordBindingRun(r.Context(), r.PathValue("id"), id); err != nil {
 		slog.ErrorContext(r.Context(), "webhook receipt update failed", "error", err)
 	}
 	wait := false
@@ -531,24 +522,8 @@ func (s *Server) hook(w http.ResponseWriter, r *http.Request) {
 	s.sendHookResult(w, r, id, workflowID, wait)
 }
 func (s *Server) steps(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.store.DB.Query(r.Context(), "SELECT node_id,attempt,status,error,started_at::text,finished_at::text FROM steps WHERE run_id=$1 ORDER BY started_at", r.PathValue("id"))
+	items, err := s.store.Steps(r.Context(), r.PathValue("id"))
 	if err != nil {
-		fail(w, err)
-		return
-	}
-	defer rows.Close()
-	items := []map[string]any{}
-	for rows.Next() {
-		var node, status, started string
-		var message, finished *string
-		var attempt int
-		if err = rows.Scan(&node, &attempt, &status, &message, &started, &finished); err != nil {
-			fail(w, err)
-			return
-		}
-		items = append(items, map[string]any{"nodeId": node, "attempt": attempt, "status": status, "error": message, "startedAt": started, "finishedAt": finished})
-	}
-	if err = rows.Err(); err != nil {
 		fail(w, err)
 		return
 	}
@@ -556,34 +531,11 @@ func (s *Server) steps(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) bindings(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.store.DB.Query(r.Context(), "SELECT id,node_id,mode,token_cipher,last_run_id::text,received_at::text FROM trigger_bindings WHERE workflow_id=$1 ORDER BY created_at DESC", r.PathValue("id"))
+	items, err := s.store.Bindings(r.Context(), r.PathValue("id"))
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	defer rows.Close()
-	result := []map[string]any{}
-	for rows.Next() {
-		var id, node, mode string
-		var sealed []byte
-		var run, received *string
-		if err = rows.Scan(&id, &node, &mode, &sealed, &run, &received); err != nil {
-			fail(w, err)
-			return
-		}
-		token := ""
-		if len(sealed) > 0 {
-			if err = s.store.Cipher.Open(sealed, "binding:"+id, &token); err != nil {
-				fail(w, err)
-				return
-			}
-		}
-		result = append(result, map[string]any{"id": id, "nodeId": node, "mode": mode, "path": "/hooks/" + id, "token": token, "runId": run, "receivedAt": received})
-	}
-	if err = rows.Err(); err != nil {
-		fail(w, err)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
-	respond(w, 200, result)
+	respond(w, 200, items)
 }

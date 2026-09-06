@@ -23,10 +23,10 @@
       },
       "temperature": {
         "type": "number",
-        "title": "Temperature",
-        "description": "Response randomness from 0 (focused) to 2 (varied).",
         "minimum": 0,
         "maximum": 2,
+        "title": "Temperature",
+        "description": "Response randomness from 0 (focused) to 2 (varied).",
         "default": 0.2
       }
     },
@@ -78,5 +78,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "e91b09381a3ecdbe8dccf1efc10a1e084d11909e8bf474cc8c934c86c8d1d87f"
+  "digest": "d28c06a4d33bcc890ef4ec06fe9a67c45625cc34f82597f0a5be86ee1ab5e31c"
 }
