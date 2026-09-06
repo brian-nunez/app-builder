@@ -23,14 +23,14 @@
       },
       "sslmode": {
         "type": "string",
-        "title": "TLS mode",
-        "description": "PostgreSQL sslmode used for the connection.",
         "enum": [
           "verify-full",
           "verify-ca",
           "require",
           "disable"
         ],
+        "title": "TLS mode",
+        "description": "PostgreSQL sslmode used for the connection.",
         "default": "verify-full"
       }
     },
@@ -113,5 +113,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "d0f4024755714b65969bcd8c9ef63c7d1b3d0936cdb5fe13162ef49611a2dc3e"
+  "digest": "1d87d05a9ec2f9093d00d21670acc41d81bdfa0a4a22d7e1ef6d851f3af8ad41"
 }

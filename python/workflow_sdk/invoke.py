@@ -1,5 +1,4 @@
 import asyncio
-import importlib.util
 import json
 import os
 import sys
@@ -10,12 +9,18 @@ from opentelemetry.propagate import extract
 from opentelemetry.trace import Status, StatusCode
 
 from .context import Context, PluginError, Telemetry
-from .registry import PROTOCOL, catalog
+from .declare import PROTOCOL
+from .registry import ArtifactError, load_module, resolve
 
 
 async def invoke(request):
-    manifest, directory = catalog(os.environ['WORKFLOW_PLUGIN_ROOT'])[(request['plugin'], request['version'])]
     if request['protocol'] != PROTOCOL:
+        raise PluginError('artifact_mismatch')
+    try:
+        manifest, directory = resolve(os.environ['WORKFLOW_PLUGIN_ROOT'], request['plugin'], request['version'])
+    except ArtifactError:
+        raise PluginError('artifact_mismatch') from None
+    if request.get('digest') and request['digest'] != manifest['digest']:
         raise PluginError('artifact_mismatch')
     jsonschema.validate(request['config'], manifest['configSchema'])
     for port in manifest['inputs']:
@@ -31,9 +36,7 @@ async def invoke(request):
                     jsonschema.validate(item, port['schema'])
             else:
                 jsonschema.validate(value, port['schema'])
-    spec = importlib.util.spec_from_file_location('installed_plugin', directory / 'plugin.py')
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = load_module(directory, 'installed_plugin')
     telemetry = Telemetry()
     try:
         context = Context(request, manifest, telemetry.logger)
@@ -66,6 +69,8 @@ def main():
     sys.stdout = sys.stderr
     try:
         result = asyncio.run(invoke(json.load(sys.stdin)))
+    except PluginError as error:
+        result = {'protocol': PROTOCOL, 'outputs': {}, 'error': {'code': error.code, 'message': error.code, 'retryable': error.retryable}}
     except Exception:
         result = {'protocol': PROTOCOL, 'outputs': {}, 'error': {'code': 'invalid_invocation', 'message': 'Invocation rejected', 'retryable': False}}
     protocol_output.write(json.dumps(result, allow_nan=False))

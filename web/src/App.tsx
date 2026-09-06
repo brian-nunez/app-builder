@@ -4,8 +4,6 @@ import {
   Background,
   Controls,
   MiniMap,
-  applyNodeChanges,
-  applyEdgeChanges,
   BackgroundVariant,
   MarkerType,
 } from '@xyflow/react';
@@ -13,8 +11,6 @@ import type {
   ReactFlowInstance,
   Connection,
   Edge,
-  NodeChange,
-  EdgeChange,
 } from '@xyflow/react';
 import {
   ArrowLeft,
@@ -42,52 +38,24 @@ import {
   X,
 } from 'lucide-react';
 import { api, APIError } from './lib/api';
+import {
+  configDefaults,
+  useWorkflowDocument,
+} from './lib/document';
+import { useRunFeed } from './lib/runs';
+import { COMPONENTS, WORKFLOWS, useRoute } from './lib/route';
 import type {
   Manifest,
-  Revision,
-  Run,
-  RunDetail,
-  Step,
   Workflow,
   WorkflowNode as Definition,
 } from './lib/types';
 import { WorkflowNode } from './components/WorkflowNode';
 import type { CanvasNode } from './components/WorkflowNode';
 import { Inspector } from './components/Inspector';
-import { compatible, latestPlugins, portSide } from './lib/connections';
+import { canConnect, compatible, latestPlugins, portSide } from './lib/connections';
 
 const nodeTypes = { plugin: WorkflowNode };
 const emptyGraph = { nodes: [], edges: [] };
-const configDefaults = (manifest: Manifest) =>
-  Object.fromEntries(
-    Object.entries(manifest.configSchema.properties ?? {}).map(([key, value]) => [
-      key,
-      value.default ??
-        (value.type === 'string'
-          ? ''
-          : value.type === 'boolean'
-            ? false
-            : value.type === 'object'
-              ? {}
-              : value.type === 'array'
-                ? []
-                : null),
-    ]),
-  );
-const unavailableManifest = (definition: Definition): Manifest => ({
-  protocol: 'workflow.plugin/v1',
-  name: definition.plugin,
-  version: definition.version,
-  title: 'Unavailable plugin',
-  description: 'This plugin is not installed. Replace or remove this node.',
-  category: 'Unavailable',
-  kind: 'action',
-  configSchema: { type: 'object', properties: {} },
-  inputs: [],
-  outputs: [],
-  permissions: [],
-  digest: '',
-});
 const relative = (value: string) =>
   new Date(value).toLocaleString(undefined, {
     month: 'short',
@@ -160,22 +128,13 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [catalog, setCatalog] = useState<Record<string, Manifest>>({});
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [page, setPage] = useState<'workflows' | 'components'>('workflows');
-  const [nodes, setNodes] = useState<CanvasNode[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All components');
   const [catalogOpen, setCatalogOpen] = useState(true);
   const [panel, setPanel] = useState<'history' | 'runs' | null>(null);
-  const [history, setHistory] = useState<Revision[]>([]);
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
   const [runTab, setRunTab] = useState<'input' | 'output' | 'steps'>('output');
   const [activeRun, setActiveRun] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState('Saved');
   const [error, setError] = useState('');
   const [modal, setModal] = useState<'create' | 'run' | 'add' | 'rename' | 'delete' | null>(null);
   const [name, setName] = useState('');
@@ -183,18 +142,18 @@ export default function App() {
   const [actionWorkflow, setActionWorkflow] = useState<Workflow | null>(null);
   const [workflowMenu, setWorkflowMenu] = useState<string | null>(null);
 
-  const dirty = useRef(false);
-  const saveBlocked = useRef(false);
-  const saving = useRef(false);
-  const generation = useRef(0);
-  const workflowRef = useRef<Workflow | null>(null);
-  const graphRef = useRef({ nodes, edges });
+  const [route, navigate] = useRoute();
+  const page = route.name === 'components' ? 'components' : 'workflows';
   const flowRef = useRef<ReactFlowInstance<CanvasNode, Edge> | null>(null);
   const onError = useCallback((error: unknown) => {
     setError(error instanceof Error ? error.message : String(error));
     if (error instanceof APIError && error.status === 401)
       setAuthenticated(false);
   }, []);
+  const doc = useWorkflowDocument(catalog, onError);
+  const { workflow, nodes, edges, graph: graphRef, apply } = doc;
+  const { history, runs, steps, detail: runDetail, setSteps, setDetail: setRunDetail } =
+    useRunFeed(workflow?.id ?? null, panel, activeRun, onError);
   const refresh = useCallback(async () => {
     try {
       const [plugins, list] = await Promise.all([
@@ -212,180 +171,6 @@ export default function App() {
     const task = window.setTimeout(() => void refresh(), 0);
     return () => window.clearTimeout(task);
   }, [refresh]);
-  const install = useCallback(
-    (item: Workflow) => {
-      generation.current++;
-      let upgraded = false;
-      saveBlocked.current = false;
-      workflowRef.current = item;
-      setWorkflow(item);
-      const nextNodes: CanvasNode[] = (item.graph.nodes ?? []).map(
-        (definition) => {
-          const exact = catalog[`${definition.plugin}@${definition.version}`];
-          const replacement = exact ?? latestPlugins(catalog).find((manifest) => manifest.name === definition.plugin);
-          const manifest = replacement ?? unavailableManifest(definition);
-          const nextDefinition = replacement && !exact
-            ? {
-                ...definition,
-                version: replacement.version,
-                config: { ...configDefaults(replacement), ...definition.config },
-              }
-            : definition;
-          if (replacement && !exact) upgraded = true;
-          return {
-            id: nextDefinition.id,
-            type: 'plugin',
-            position: nextDefinition.position,
-            data: { definition: nextDefinition, manifest },
-          };
-        },
-      );
-      const nextEdges = (item.graph.edges ?? []).map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourcePort,
-        targetHandle: e.targetPort,
-        type: 'smoothstep',
-      }));
-      graphRef.current = { nodes: nextNodes, edges: nextEdges };
-      dirty.current = upgraded;
-      setNodes(nextNodes);
-      setEdges(nextEdges);
-      setSelected(null);
-      setSaveState(upgraded ? 'Upgrading plugins…' : 'Saved');
-      setError(upgraded ? 'Older plugin versions were upgraded to the installed versions. The workflow will be saved as a new revision.' : '');
-    },
-    [catalog],
-  );
-  const save = useCallback(async () => {
-    const current = workflowRef.current;
-    if (!current || !dirty.current || saving.current || saveBlocked.current)
-      return;
-    saving.current = true;
-    dirty.current = false;
-    setSaveState('Saving…');
-    const version = generation.current;
-    const graph = {
-      nodes: graphRef.current.nodes.map((n) => ({
-        ...n.data.definition,
-        position: n.position,
-      })),
-      edges: graphRef.current.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourcePort: e.sourceHandle ?? '',
-        targetPort: e.targetHandle ?? '',
-      })),
-    };
-    try {
-      const saved = await api<Workflow>(`/api/workflows/${current.id}`, 'PUT', {
-        name: current.name,
-        base: current.head,
-        graph,
-        message: 'Updated workflow',
-      });
-      if (generation.current === version) {
-        workflowRef.current = saved;
-        setWorkflow(saved);
-        setSaveState(dirty.current ? 'Unsaved changes' : 'Saved');
-      }
-    } catch (error) {
-      if (generation.current === version) {
-        dirty.current = true;
-        saveBlocked.current = true;
-        setSaveState('Save failed');
-        onError(error);
-      }
-    } finally {
-      saving.current = false;
-    }
-  }, [onError]);
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (dirty.current && !saving.current) void save();
-    }, 1200);
-    return () => window.clearInterval(timer);
-  }, [save]);
-  useEffect(() => {
-    const handler = (event: BeforeUnloadEvent) => {
-      if (dirty.current || saving.current) event.preventDefault();
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, []);
-  useEffect(() => {
-    if (!workflow || !panel) return;
-    let stale = false;
-    const load = async () => {
-      try {
-        if (panel === 'history') {
-          const result = await api<Revision[]>(
-            `/api/workflows/${workflow.id}/history`,
-          );
-          if (!stale) setHistory(result);
-        } else {
-          const result = await api<Run[]>(`/api/workflows/${workflow.id}/runs`);
-          if (!stale) setRuns(result);
-          if (activeRun) {
-            const [stepResult, detailResult] = await Promise.all([
-              api<Step[]>(`/api/runs/${activeRun}/steps`),
-              api<RunDetail>(`/api/runs/${activeRun}`),
-            ]);
-            if (!stale) {
-              setSteps(stepResult);
-              setRunDetail(detailResult);
-            }
-          }
-        }
-      } catch (error) {
-        if (!stale) onError(error);
-      }
-    };
-    void load();
-    const timer = window.setInterval(() => void load(), 2500);
-    return () => {
-      stale = true;
-      window.clearInterval(timer);
-    };
-  }, [workflow, panel, activeRun, onError]);
-  const changeGraph = (nextNodes: CanvasNode[], nextEdges: Edge[]) => {
-    setNodes(nextNodes);
-    setEdges(nextEdges);
-    graphRef.current = { nodes: nextNodes, edges: nextEdges };
-    dirty.current = true;
-    saveBlocked.current = false;
-    setSaveState('Unsaved changes');
-  };
-  const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
-    const next = applyNodeChanges(changes, graphRef.current.nodes);
-    const substantive = changes.some(
-      (c) => c.type === 'remove' || c.type === 'position',
-    );
-    if (substantive)
-      changeGraph(
-        next,
-        graphRef.current.edges.filter(
-          (e) =>
-            next.some((n) => n.id === e.source) &&
-            next.some((n) => n.id === e.target),
-        ),
-      );
-    else {
-      setNodes(next);
-      graphRef.current.nodes = next;
-    }
-  };
-  const onEdgesChange = (changes: EdgeChange[]) => {
-    const next = applyEdgeChanges(changes, graphRef.current.edges);
-    if (changes.some((c) => c.type === 'remove'))
-      changeGraph(graphRef.current.nodes, next);
-    else {
-      setEdges(next);
-      graphRef.current.edges = next;
-    }
-  };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -423,9 +208,9 @@ export default function App() {
           const newDef = { ...definition, id: newId, position };
           const manifest = catalog[`${definition.plugin}@${definition.version}`];
           if (!manifest) return;
-          changeGraph(
+          apply(
             [
-              ...graphRef.current.nodes.map(n => ({ ...n, selected: false })),
+              ...graphRef.current.nodes.map((n) => ({ ...n, selected: false })),
               {
                 id: newId,
                 type: 'plugin',
@@ -444,7 +229,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [selected, catalog]);
+  }, [selected, catalog, apply, graphRef]);
   const connect = (c: Connection) => {
     const source = graphRef.current.nodes
       .find((n) => n.id === c.source)
@@ -491,7 +276,7 @@ export default function App() {
       : graphRef.current.edges.filter(
           (e) => e.target !== c.target || e.targetHandle !== c.targetHandle,
         );
-    changeGraph(graphRef.current.nodes, [
+    doc.apply(graphRef.current.nodes, [
       ...retained,
       { ...c, id: crypto.randomUUID(), type: 'smoothstep' },
     ]);
@@ -520,7 +305,7 @@ export default function App() {
       config,
       position,
     };
-    changeGraph(
+    doc.apply(
       [
         ...graphRef.current.nodes,
         {
@@ -583,29 +368,44 @@ export default function App() {
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const canAct = saveState === 'Saved';
-  const open = async (id: string) => {
-    try {
-      install(await api<Workflow>(`/api/workflows/${id}`));
-      setPanel(null);
-    } catch (error) {
-      onError(error);
-    }
-  };
+  const canAct = doc.status === 'saved';
+  const open = useCallback(
+    async (id: string) => {
+      try {
+        doc.open(await api<Workflow>(`/api/workflows/${id}`));
+        setPanel(null);
+        navigate({ name: 'editor', workflowId: id });
+      } catch (error) {
+        onError(error);
+      }
+    },
+    [doc, navigate, onError],
+  );
+  // A shared or reloaded /workflows/:id link opens that workflow once the plugin
+  // catalog is present, so nodes resolve against their manifests immediately.
+  const requested = route.name === 'editor' ? route.workflowId : null;
+  useEffect(() => {
+    if (!authenticated || !requested || workflow?.id === requested) return;
+    if (!Object.keys(catalog).length) return;
+    // open() is async and touches state only after its fetch resolves; the rule
+    // cannot see that, and the URL is exactly the external system effects exist
+    // to synchronise with.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void open(requested);
+  }, [authenticated, requested, workflow?.id, catalog, open]);
   const back = async () => {
-    await save();
-    if (dirty.current || saving.current) return;
-    generation.current++;
-    workflowRef.current = null;
-    setWorkflow(null);
+    await doc.save();
+    if (!doc.settled()) return;
+    doc.close();
     setQuery('');
     setPanel(null);
+    navigate(WORKFLOWS);
     void refresh();
   };
   const restore = async (revision: number, nodeId?: string) => {
     if (!workflow || !canAct) return;
     try {
-      install(
+      doc.open(
         await api<Workflow>(`/api/workflows/${workflow.id}/restore`, 'POST', {
           revision,
           base: workflow.head,
@@ -661,7 +461,7 @@ export default function App() {
             aria-label="Workflows"
             onClick={() => {
               void back();
-              setPage('workflows');
+              navigate(WORKFLOWS);
             }}
           >
             <WorkflowIcon size={20} />
@@ -672,7 +472,7 @@ export default function App() {
             aria-label="Components"
             onClick={() => {
               void back();
-              setPage('components');
+              navigate(COMPONENTS);
             }}
           >
             <Box size={20} />
@@ -727,9 +527,9 @@ export default function App() {
             <span>Local workspace</span>
           </div>
         </header>
-        {error && (
+        {(error || doc.notice) && (
           <div className="error-banner" role="alert">
-            <span>{error}</span>
+            <span>{error || doc.notice}</span>
             {workflow && (
               <button onClick={() => void open(workflow.id)}>
                 Reload saved revision
@@ -943,14 +743,14 @@ export default function App() {
                 </span>
               </div>
               <span className="save-status">
-                {saveState === 'Saving…' ? (
+                {doc.status === 'saving' ? (
                   <LoaderCircle size={13} className="spin" />
-                ) : saveState === 'Saved' ? (
+                ) : doc.status === 'saved' ? (
                   <Check size={13} />
                 ) : (
                   <Circle size={8} />
                 )}{' '}
-                {saveState}
+                {doc.label}
               </span>
               <div className="toolbar-actions">
                 <button
@@ -1000,9 +800,7 @@ export default function App() {
                         'POST',
                         { base: workflow.head },
                       );
-                      const item = { ...workflow, published: workflow.head };
-                      setWorkflow(item);
-                      workflowRef.current = item;
+                      doc.adopt({ ...workflow, published: workflow.head });
                     } catch (error) {
                       onError(error);
                     }
@@ -1110,8 +908,8 @@ export default function App() {
                     return { ...edge, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed, color: resource ? '#475569' : '#2563eb', width: 20, height: 20 }, style: { stroke: resource ? '#475569' : '#2563eb', strokeWidth: 2, strokeDasharray: resource ? '6 4' : undefined } };
                   })}
                   nodeTypes={nodeTypes}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
+                  onNodesChange={doc.onNodesChange}
+                  onEdgesChange={doc.onEdgesChange}
                   onConnect={connect}
                   onNodeClick={(_, n) => setSelected(n.id)}
                   onPaneClick={() => setSelected(null)}
@@ -1138,19 +936,13 @@ export default function App() {
                       ?.data.manifest.inputs.find(
                         (p) => p.name === c.targetHandle,
                       );
-                    return (
-                      !!source &&
-                      !!target &&
-                      source.kind === target.kind &&
-                      source.resourceType === target.resourceType &&
-                      (!source.sensitive || !!target.sensitive) &&
-                      (!!target.multiple ||
-                        !edges.some(
-                          (e) =>
-                            e.target === c.target &&
-                            e.targetHandle === c.targetHandle,
-                        ))
-                    );
+                    if (!source || !target) return false;
+                    const bound = edges.filter(
+                      (e) =>
+                        e.target === c.target &&
+                        e.targetHandle === c.targetHandle,
+                    ).length;
+                    return canConnect(source, target, bound);
                   }}
                 >
                   <Background
@@ -1191,7 +983,7 @@ export default function App() {
                   manifest={selectedNode.data.manifest}
                   onClose={() => setSelected(null)}
                   onChange={(definition) =>
-                    changeGraph(
+                    doc.apply(
                       graphRef.current.nodes.map((n) =>
                         n.id === definition.id
                           ? { ...n, data: { ...n.data, definition } }
@@ -1201,7 +993,7 @@ export default function App() {
                     )
                   }
                   onDelete={() => {
-                    changeGraph(
+                    doc.apply(
                       nodes.filter((n) => n.id !== selected),
                       edges.filter(
                         (e) => e.source !== selected && e.target !== selected,
@@ -1214,7 +1006,7 @@ export default function App() {
                     if (!existing) return;
                     const newId = crypto.randomUUID();
                     const position = { x: existing.position.x + 30, y: existing.position.y + 30 };
-                    changeGraph([
+                    doc.apply([
                       ...graphRef.current.nodes.map(n => n.id === existing.id ? { ...n, selected: false } : n),
                       {
                         ...existing,
@@ -1240,7 +1032,7 @@ export default function App() {
                   onVersion={(version) => {
                     const m =
                       catalog[`${selectedNode.data.manifest.name}@${version}`];
-                    changeGraph(
+                    doc.apply(
                       graphRef.current.nodes.map((n) =>
                         n.id === selectedNode.id
                           ? {
@@ -1267,7 +1059,7 @@ export default function App() {
                         targetHandle: input,
                       }),
                     onUnbind: (id) =>
-                      changeGraph(
+                      doc.apply(
                         graphRef.current.nodes,
                         graphRef.current.edges.filter((e) => e.id !== id),
                       ),
@@ -1471,9 +1263,9 @@ export default function App() {
                       base: 0,
                       message: 'Created workflow',
                     });
-                    install(item);
+                    doc.open(item);
                     setModal(null);
-                    setPage('workflows');
+                    navigate({ name: 'editor', workflowId: item.id });
                   } catch (error) {
                     onError(error);
                   }
@@ -1524,13 +1316,8 @@ export default function App() {
                 e.preventDefault();
                 if (!actionWorkflow) return;
                 try {
-                  if (workflowRef.current?.id === actionWorkflow.id) {
-                    const updated = { ...workflowRef.current, name: name.trim() };
-                    workflowRef.current = updated;
-                    setWorkflow(updated);
-                    dirty.current = true;
-                    saveBlocked.current = false;
-                    setSaveState('Unsaved changes');
+                  if (workflow?.id === actionWorkflow.id) {
+                    doc.rename(name.trim());
                   } else {
                     const current = await api<Workflow>(`/api/workflows/${actionWorkflow.id}`);
                     await api<Workflow>(`/api/workflows/${actionWorkflow.id}`, 'PUT', { name: name.trim(), base: current.head, graph: current.graph, message: 'Renamed workflow' });

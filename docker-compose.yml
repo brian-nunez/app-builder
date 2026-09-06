@@ -139,11 +139,17 @@ services:
     environment:
       WORKFLOW_WORKER_TOKEN: ${WORKER_TOKEN:?Run make configure}
       WORKFLOW_ALLOWED_HOSTS: ${PLUGIN_ALLOWED_HOSTS:-}
+      WORKFLOW_WORKER_CAPACITY: ${WORKER_CAPACITY:-4}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
       OTEL_EXPORTER_OTLP_TIMEOUT: '5'
       OTEL_METRIC_EXPORT_INTERVAL: '10000'
     ports:
       - '127.0.0.1:8090:8090'
+    # The installed plugin tree is one artifact read by both services. Mounting it
+    # read-only means adding a plugin is a restart, not an image rebuild, and the
+    # platform's startup catalog check proves both sides resolved the same files.
+    volumes:
+      - ./plugins:/plugins:ro
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:
@@ -179,6 +185,8 @@ services:
       APP__WORKER__ENDPOINT: http://worker:8090
       APP__WORKER__TOKEN: ${WORKER_TOKEN:?Run make configure}
       APP__TELEMETRY__OTLP_ENDPOINT: collector:4317
+    volumes:
+      - ./plugins:/app/plugins:ro
     expose: ['8080']
     depends_on:
       postgres:

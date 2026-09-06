@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/brian-nunez/app-builder/internal/config"
@@ -17,7 +16,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -25,7 +23,11 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 	if err := run(); err != nil {
+		// Telemetry may have redirected slog to the collector by now. A fatal
+		// startup error has to reach the container log, where an operator reading
+		// "docker compose logs" will actually see it.
 		slog.Error("application stopped", "error", err)
+		fmt.Fprintf(os.Stderr, "\napplication stopped: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -67,24 +69,19 @@ func run() error {
 	if err = store.Migrate(ctx); err != nil {
 		return err
 	}
-	paths, err := filepath.Glob(filepath.Join(cfg.String("plugins.directory"), "*", "manifest.json"))
+	// One loader for the installed packages: it parses each manifest, validates
+	// its identity, and re-hashes the package so a handler edited without a
+	// rebuild is refused here rather than discovered mid-run.
+	packages, err := plugin.Load(cfg.String("plugins.directory"))
 	if err != nil {
 		return err
 	}
 	installed := map[string]bool{}
-	for _, path := range paths {
-		raw, err := os.ReadFile(path)
-		if err != nil {
+	for _, item := range packages {
+		if err = store.Register(ctx, item.Manifest); err != nil {
 			return err
 		}
-		var manifest plugin.Manifest
-		if err = json.Unmarshal(raw, &manifest); err != nil {
-			return err
-		}
-		if err = store.Register(ctx, manifest); err != nil {
-			return err
-		}
-		installed[manifest.Name+"@"+manifest.Version] = true
+		installed[item.Manifest.Key()] = true
 	}
 	catalog, err := store.Catalog(ctx)
 	if err != nil {
@@ -92,7 +89,7 @@ func run() error {
 	}
 	for key, manifest := range catalog {
 		if !installed[key] {
-			if _, err = store.DB.Exec(ctx, "DELETE FROM plugin_versions WHERE name=$1 AND version=$2", manifest.Name, manifest.Version); err != nil {
+			if err = store.Uninstall(ctx, manifest.Name, manifest.Version); err != nil {
 				return err
 			}
 		}
@@ -112,6 +109,19 @@ func run() error {
 			},
 		},
 	}
+	// The platform and the worker load plugins from separate filesystems. Confirm
+	// they resolved the same artifacts, and take the concurrency limit from the
+	// side that owns it, before accepting any work.
+	report, err := worker.Catalog(ctx)
+	if err != nil {
+		return fmt.Errorf("plugin worker is unreachable: %w", err)
+	}
+	if err = execution.Agree(packages, report); err != nil {
+		return err
+	}
+	worker.Capacity = report.Capacity
+	worker.Start()
+	slog.Info("plugin catalog verified", "plugins", len(packages), "worker.capacity", report.Capacity)
 	manager := brun.New()
 	manager.Register(api, worker)
 	if err = manager.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {

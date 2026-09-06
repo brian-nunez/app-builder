@@ -1,3 +1,42 @@
 from .context import Context, PluginError
+from .declare import (
+    Boolean,
+    Counter,
+    DeclarationError,
+    Histogram,
+    Integer,
+    Json,
+    List,
+    Metric,
+    Number,
+    Object,
+    Raw,
+    Resource,
+    Text,
+    Value,
+    action,
+    resource,
+    trigger,
+)
 
-__all__ = ['Context', 'PluginError']
+__all__ = [
+    'Context',
+    'PluginError',
+    'action',
+    'resource',
+    'trigger',
+    'Text',
+    'Integer',
+    'Number',
+    'Boolean',
+    'Json',
+    'Object',
+    'List',
+    'Raw',
+    'Resource',
+    'Value',
+    'Metric',
+    'Counter',
+    'Histogram',
+    'DeclarationError',
+]

@@ -11,9 +11,9 @@
     "properties": {
       "variable": {
         "type": "string",
+        "pattern": "^PLUGIN_SECRET_[A-Z0-9_]+$",
         "title": "Environment variable",
         "description": "Name of an allowlisted variable available to the worker.",
-        "pattern": "^PLUGIN_SECRET_[A-Z0-9_]+$",
         "default": "PLUGIN_SECRET_SERVICE_TOKEN"
       }
     },
@@ -40,5 +40,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "c25700b642b848d5ca7e2da20e0c42434e3db34842a70cbda946a68a8b628b35"
+  "digest": "5c1ebcc5c255a50e7f523c8d53eba4632f7603921c479e4deee43f462456f69b"
 }

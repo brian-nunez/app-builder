@@ -3,10 +3,8 @@ package server
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"github.com/brian-nunez/app-builder/internal/platform"
 	"github.com/brian-nunez/baccess"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -193,5 +191,4 @@ func (a *auth) protect(next http.Handler) http.Handler {
 func randomToken() string {
 	return rand.Text() + rand.Text()
 }
-func tokenHash(v string) string    { h := sha256.Sum256([]byte(v)); return hex.EncodeToString(h[:]) }
 func actor(r *http.Request) string { v, _ := r.Context().Value(actorKey{}).(string); return v }

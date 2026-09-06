@@ -1,6 +1,29 @@
-from workflow_sdk import PluginError
+from workflow_sdk import Counter, Json, PluginError, Text, action
 
 
+@action(
+    name='community.json-field',
+    version='1.0.0',
+    title='JSON field',
+    description='Extract a value from a document using a JSON Pointer. Sensitive data stays protected.',
+    category='Data',
+    config={
+        'pointer': Text(
+            'JSON Pointer',
+            description='RFC 6901 path such as /customer/email. Leave blank for the full document.',
+            default='',
+            pattern='^($|/)',
+        ),
+    },
+    inputs={
+        'document': Json('Document', sensitive=True),
+    },
+    outputs={
+        'value': Json('Value', sensitive=True),
+    },
+    log_fields=['value_type'],
+    metrics=[Counter('json.fields.resolved', '{field}', 'Successfully resolved JSON fields')],
+)
 async def execute(ctx):
     value = ctx.inputs['document']
     pointer = ctx.config['pointer']

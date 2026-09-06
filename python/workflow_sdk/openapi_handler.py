@@ -1,6 +1,6 @@
 import jsonschema
 from urllib.parse import quote, urlencode
-from workflow_sdk import PluginError
+from workflow_sdk import Integer, Json, PluginError, Raw, Text, action
 
 async def invoke(ctx):
     document = ctx.config['document']

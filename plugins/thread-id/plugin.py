@@ -2,7 +2,7 @@ import secrets
 import time
 from uuid import UUID
 
-from workflow_sdk import PluginError
+from workflow_sdk import Object, PluginError, Text, action
 
 
 def uuid7():
@@ -14,6 +14,27 @@ def uuid7():
     return str(UUID(int=value))
 
 
+@action(
+    name='community.thread-id',
+    version='1.0.0',
+    title='Thread ID',
+    description='Preserve a supplied thread ID or generate a UUIDv7 when the field is absent.',
+    category='Data',
+    config={
+        'field': Text(
+            'Thread ID field',
+            description='Input object field to reuse, or populate with a new UUIDv7 when absent.',
+            min_length=1,
+            default='thread_id',
+        ),
+    },
+    inputs={
+        'document': Object('Document', sensitive=True),
+    },
+    outputs={
+        'value': Text('Thread ID', min_length=1, sensitive=True),
+    },
+)
 async def execute(ctx):
     document = ctx.inputs['document']
     field = ctx.config['field']

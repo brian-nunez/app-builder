@@ -17,8 +17,6 @@
       },
       "methods": {
         "type": "array",
-        "title": "Allowed methods",
-        "description": "HTTP methods the agent is permitted to use.",
         "items": {
           "type": "string",
           "enum": [
@@ -32,25 +30,27 @@
         },
         "minItems": 1,
         "uniqueItems": true,
+        "title": "Allowed methods",
+        "description": "HTTP methods the agent is permitted to use.",
         "default": [
           "GET"
         ]
       },
       "allowed_origins": {
         "type": "array",
-        "title": "Additional origins",
-        "description": "Optional HTTP or HTTPS origins the tool may access, one per line.",
         "items": {
           "type": "string"
         },
         "uniqueItems": true,
+        "title": "Additional origins",
+        "description": "Optional HTTP or HTTPS origins the tool may access, one per line.",
         "default": []
       },
       "allow_any_url": {
         "type": "boolean",
-        "default": false,
         "title": "Allow any HTTP/HTTPS URL",
-        "description": "Permit requests outside the configured origins. Use only for trusted agents."
+        "description": "Permit requests outside the configured origins. Use only for trusted agents.",
+        "default": false
       }
     },
     "required": [
@@ -80,5 +80,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "0bb5a56e0e544263049535ffd12ef51548d1c8c23b7b953f7a810275edd6811c"
+  "digest": "5540d55b0e6abd8ed13345d5c6ea5a9ffafc68caebd8b846d7f2035fe1b7abe3"
 }

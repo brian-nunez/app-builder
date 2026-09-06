@@ -11,10 +11,10 @@
     "properties": {
       "pointer": {
         "type": "string",
+        "pattern": "^($|/)",
         "title": "JSON Pointer",
         "description": "RFC 6901 path such as /customer/email. Leave blank for the full document.",
-        "default": "",
-        "pattern": "^($|/)"
+        "default": ""
       }
     },
     "required": [
@@ -27,9 +27,9 @@
       "name": "document",
       "title": "Document",
       "kind": "data",
+      "schema": {},
       "required": true,
-      "sensitive": true,
-      "schema": {}
+      "sensitive": true
     }
   ],
   "outputs": [
@@ -37,9 +37,9 @@
       "name": "value",
       "title": "Value",
       "kind": "data",
+      "schema": {},
       "required": true,
-      "sensitive": true,
-      "schema": {}
+      "sensitive": true
     }
   ],
   "permissions": [],
@@ -54,5 +54,5 @@
       "description": "Successfully resolved JSON fields"
     }
   ],
-  "digest": "5de9bb2b74130eef9964df860e1fba2d4dfba891e7ce35d26504e8519c40461a"
+  "digest": "6cbe2952d23e56eccb26c54a8c931649f6e7c7af8411f6e899b4187bac8372ca"
 }

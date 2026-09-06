@@ -23,10 +23,10 @@
       },
       "recursion_limit": {
         "type": "integer",
-        "title": "Recursion limit",
-        "description": "Maximum agent graph steps allowed for one invocation.",
         "minimum": 1,
         "maximum": 100,
+        "title": "Recursion limit",
+        "description": "Maximum agent graph steps allowed for one invocation.",
         "default": 25
       }
     },
@@ -139,5 +139,5 @@
       "description": "Messages produced or consumed by an agent invocation"
     }
   ],
-  "digest": "38b33c99dd384b66cd40172dc7d54c85c6016949b73363c6941888a2fdc975a1"
+  "digest": "5bc62f87885991eef8cc0649d8e9d14f6aeed7ece617f90b842f8556b4376613"
 }

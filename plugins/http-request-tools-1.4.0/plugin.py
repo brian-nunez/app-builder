@@ -3,7 +3,7 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 from langchain_core.tools import StructuredTool, ToolException
-from workflow_sdk import PluginError
+from workflow_sdk import Boolean, List, PluginError, Resource, Text, resource
 
 
 MAX_AGENT_BODY_BYTES = 32 * 1024
@@ -20,6 +20,40 @@ def origin(url):
     return parsed.scheme, parsed.hostname.lower(), port
 
 
+@resource(
+    name='community.http-request-tools',
+    version='1.4.0',
+    title='HTTP request tools',
+    description='Provide HTTP tools for a configured service and explicitly allowed additional origins.',
+    category='AI resources',
+    config={
+        'base_url': Text('Base URL', description='Default service origin used for relative request paths.', default='http://consul:8500'),
+        'methods': List(
+            'Allowed methods',
+            description='HTTP methods the agent is permitted to use.',
+            items=Text(options=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']),
+            min_items=1,
+            unique=True,
+            default=['GET'],
+        ),
+        'allowed_origins': List(
+            'Additional origins',
+            description='Optional HTTP or HTTPS origins the tool may access, one per line.',
+            items=Text(),
+            unique=True,
+            default=[],
+        ),
+        'allow_any_url': Boolean(
+            'Allow any HTTP/HTTPS URL',
+            description='Permit requests outside the configured origins. Use only for trusted agents.',
+            default=False,
+        ),
+    },
+    outputs={
+        'tools': Resource('ai.tools/v1', 'Tools', sensitive=True),
+    },
+    permissions=['network.http'],
+)
 async def execute(ctx):
     base = ctx.config['base_url']
     origin(base)

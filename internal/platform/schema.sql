@@ -38,7 +38,8 @@ CREATE OR REPLACE FUNCTION prevent_revision_mutation() RETURNS trigger LANGUAGE 
 BEGIN RAISE EXCEPTION 'revision and plugin version history is immutable'; END $$;
 DROP TRIGGER IF EXISTS revisions_immutable ON revisions;
 CREATE TRIGGER revisions_immutable BEFORE UPDATE ON revisions FOR EACH ROW EXECUTE FUNCTION prevent_revision_mutation();
-DROP TRIGGER IF EXISTS plugin_versions_immutable ON plugin_versions;
+-- Plugin version immutability is enforced in Store.Register, which allows a
+-- version no revision pins to be refreshed and freezes one that is pinned.
 ALTER TABLE trigger_bindings ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'published';
 ALTER TABLE trigger_bindings ADD COLUMN IF NOT EXISTS token_cipher bytea;
 ALTER TABLE trigger_bindings ADD COLUMN IF NOT EXISTS last_run_id uuid REFERENCES runs(id);

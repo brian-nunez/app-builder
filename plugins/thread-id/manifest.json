@@ -11,9 +11,9 @@
     "properties": {
       "field": {
         "type": "string",
+        "minLength": 1,
         "title": "Thread ID field",
         "description": "Input object field to reuse, or populate with a new UUIDv7 when absent.",
-        "minLength": 1,
         "default": "thread_id"
       }
     },
@@ -27,11 +27,11 @@
       "name": "document",
       "title": "Document",
       "kind": "data",
-      "required": true,
-      "sensitive": true,
       "schema": {
         "type": "object"
-      }
+      },
+      "required": true,
+      "sensitive": true
     }
   ],
   "outputs": [
@@ -39,16 +39,16 @@
       "name": "value",
       "title": "Thread ID",
       "kind": "data",
-      "required": true,
-      "sensitive": true,
       "schema": {
         "type": "string",
         "minLength": 1
-      }
+      },
+      "required": true,
+      "sensitive": true
     }
   ],
   "permissions": [],
   "logFields": [],
   "metrics": [],
-  "digest": "8cf3f5221c10db118e9856d478cae3897f332c3348f92eced4ef66f04ecb5fba"
+  "digest": "a3ad144fee43ec35a761634096e251a408f1dbc85667dbe1cda230f3e65f296b"
 }

@@ -1,7 +1,30 @@
 import jsonschema
 from urllib.parse import quote, urlencode
-from workflow_sdk import PluginError
+from workflow_sdk import Integer, Json, Object, PluginError, Text, action
 
+@action(
+    name='community.openapi-operation',
+    version='1.0.0',
+    title='OpenAPI operation',
+    description='Invoke an operation from a pinned OpenAPI document on a shared on-premises origin.',
+    category='Services',
+    config={
+        'base_url': Text('API base URL', description='Service root prepended to the selected operation path.', default='https://services.internal'),
+        'operation_id': Text('Operation ID', description='Exact operationId to execute from the OpenAPI document.', default=''),
+        'document': Object('OpenAPI document', description='OpenAPI JSON document containing the selected operation.', default={}),
+    },
+    inputs={
+        'parameters': Object('Parameters', required=False, sensitive=True),
+        'body': Json('Body', required=False, sensitive=True),
+        'token': Text('Token', required=False, sensitive=True),
+    },
+    outputs={
+        'response': Json('Response', sensitive=True),
+        'status': Integer('Status'),
+    },
+    permissions=['network.http'],
+    log_fields=['operation_id', 'status'],
+)
 async def execute(ctx):
     document = ctx.config['document']
     found = []
