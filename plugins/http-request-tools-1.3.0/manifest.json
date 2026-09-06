@@ -11,10 +11,14 @@
     "properties": {
       "base_url": {
         "type": "string",
+        "title": "Base URL",
+        "description": "Default service origin used for relative request paths.",
         "default": "http://consul:8500"
       },
       "methods": {
         "type": "array",
+        "title": "Allowed methods",
+        "description": "HTTP methods the agent is permitted to use.",
         "items": {
           "type": "string",
           "enum": [
@@ -34,6 +38,8 @@
       },
       "allowed_origins": {
         "type": "array",
+        "title": "Additional origins",
+        "description": "Optional HTTP or HTTPS origins the tool may access, one per line.",
         "items": {
           "type": "string"
         },
@@ -43,7 +49,8 @@
       "allow_any_url": {
         "type": "boolean",
         "default": false,
-        "title": "Allow any HTTP/HTTPS URL"
+        "title": "Allow any HTTP/HTTPS URL",
+        "description": "Permit requests outside the configured origins. Use only for trusted agents."
       }
     },
     "required": [
@@ -73,5 +80,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "ad5b170248cb36600382622c6d3bea8298725dadcac58e8178a76edc6276549c"
+  "digest": "0bb5a56e0e544263049535ffd12ef51548d1c8c23b7b953f7a810275edd6811c"
 }

@@ -11,18 +11,26 @@
     "properties": {
       "url": {
         "type": "string",
+        "title": "Vault URL",
+        "description": "Base URL of the Vault HTTP API.",
         "default": "https://vault.internal"
       },
       "mount": {
         "type": "string",
+        "title": "KV mount",
+        "description": "Name of the KV v2 secrets engine mount.",
         "default": "secret"
       },
       "path": {
         "type": "string",
+        "title": "Secret path",
+        "description": "Path to the secret within the mount.",
         "default": "services/app"
       },
       "field": {
         "type": "string",
+        "title": "Secret field",
+        "description": "Field to return from the Vault secret.",
         "default": "password"
       }
     },
@@ -61,5 +69,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "4325b50fab6be109c3b995656804a81d682431ddd9fec3c7609ecdb5aeb2591b"
+  "digest": "630d9cba10eab1e61283818ff1ad7bff5b322ac77e5667587997744d462201b5"
 }

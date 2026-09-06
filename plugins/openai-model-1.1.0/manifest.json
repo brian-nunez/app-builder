@@ -11,14 +11,20 @@
     "properties": {
       "model": {
         "type": "string",
+        "title": "Default model",
+        "description": "Model ID used when the model input is not connected.",
         "default": "gpt-4.1-mini"
       },
       "base_url": {
         "type": "string",
+        "title": "API base URL",
+        "description": "OpenAI-compatible API root, including /v1 when required.",
         "default": "https://api.openai.com/v1"
       },
       "temperature": {
         "type": "number",
+        "title": "Temperature",
+        "description": "Response randomness from 0 (focused) to 2 (varied).",
         "minimum": 0,
         "maximum": 2,
         "default": 0.2
@@ -72,5 +78,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "3e616555d851bffc0b61ae6c28703898f4eb9ab7e0e99c6204d9451dfa4771b3"
+  "digest": "e91b09381a3ecdbe8dccf1efc10a1e084d11909e8bf474cc8c934c86c8d1d87f"
 }

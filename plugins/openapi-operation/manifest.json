@@ -11,14 +11,20 @@
     "properties": {
       "base_url": {
         "type": "string",
+        "title": "API base URL",
+        "description": "Service root prepended to the selected operation path.",
         "default": "https://services.internal"
       },
       "operation_id": {
         "type": "string",
+        "title": "Operation ID",
+        "description": "Exact operationId to execute from the OpenAPI document.",
         "default": ""
       },
       "document": {
         "type": "object",
+        "title": "OpenAPI document",
+        "description": "OpenAPI JSON document containing the selected operation.",
         "default": {}
       }
     },
@@ -87,5 +93,5 @@
     "status"
   ],
   "metrics": [],
-  "digest": "3a5e0440a6ffaddc976b92a7f7279f2291471875cc2ea41e05541b3448c78373"
+  "digest": "d3e59022ddd42efcedd2de5f8cbea62fb62c93b729da10d519f273a64fc6972d"
 }

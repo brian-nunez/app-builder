@@ -1,7 +1,7 @@
 {
   "protocol": "workflow.plugin/v1",
   "name": "community.http-request-tools",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "title": "HTTP request tools",
   "description": "Provide HTTP tools for a configured service and explicitly allowed additional origins.",
   "category": "AI resources",
@@ -11,10 +11,14 @@
     "properties": {
       "base_url": {
         "type": "string",
+        "title": "Base URL",
+        "description": "Default service origin used for relative request paths.",
         "default": "http://consul:8500"
       },
       "methods": {
         "type": "array",
+        "title": "Allowed methods",
+        "description": "HTTP methods the agent is permitted to use.",
         "items": {
           "type": "string",
           "enum": [
@@ -34,17 +38,26 @@
       },
       "allowed_origins": {
         "type": "array",
+        "title": "Additional origins",
+        "description": "Optional HTTP or HTTPS origins the tool may access, one per line.",
         "items": {
           "type": "string"
         },
         "uniqueItems": true,
         "default": []
+      },
+      "allow_any_url": {
+        "type": "boolean",
+        "default": false,
+        "title": "Allow any HTTP/HTTPS URL",
+        "description": "Permit requests outside the configured origins. Use only for trusted agents."
       }
     },
     "required": [
       "base_url",
       "methods",
-      "allowed_origins"
+      "allowed_origins",
+      "allow_any_url"
     ],
     "additionalProperties": false
   },
@@ -67,5 +80,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "18572823b3dd0e335ab1f3fd5e5d31d2923b141a259b1484e18fb6183054bb5f"
+  "digest": "4c9fb64ccb2f0b4315e22252fa5fee06e3e42df66578c1c8f6cc754e66bec5ac"
 }

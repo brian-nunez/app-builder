@@ -1,6 +1,6 @@
 # Forma — Workflow Studio
 
-A Go-served Vite/React workflow editor with PostgreSQL 18 state, immutable revision history, and independently packaged Python plugins. Adapted from Brian's local BKit API template; uses bconfig, bsuite/bdb, brun, baccess, and btelemetry. No integration is compiled into the platform.
+A Go-served Vite/React workflow editor with PostgreSQL 18 state, immutable workflow revision history, and independently packaged Python plugins. Adapted from Brian's local BKit API template; uses bconfig, bsuite/bdb, brun, baccess, and btelemetry. No integration is compiled into the platform.
 
 ## Workflow View
 
@@ -13,9 +13,11 @@ make configure
 docker compose up -d --build
 ```
 
-Open http://127.0.0.1:8080. Use the `PLATFORM_ACCESS_TOKEN` from the local `.env` file. The file is generated once with mode 0600 and unique credentials; existing values are retained. Keep the encryption key backed up with the platform database. Replacing it makes existing encrypted run data and sessions unreadable.
+For organization login, open `http://<APP_PUBLIC_HOST>:8080`, using the Tailscale MagicDNS hostname stored in `.env`. The canonical hostname keeps OIDC cookies, issuer validation, and redirects on one origin. Local operator-token access remains available at http://127.0.0.1:8080. The platform publishes port 8080 on all host interfaces. Use the `PLATFORM_ACCESS_TOKEN` from the local `.env` file. The file is generated once with mode 0600 and unique credentials; existing values are retained. Keep the encryption key backed up with the platform database. Replacing it makes existing encrypted run data and sessions unreadable.
 
-The supplied Compose stack binds ports to loopback only. It runs PostgreSQL, the Go platform/UI, the Python worker, and an OpenTelemetry Collector. The collector exports all three signals to its local debug output for inspection. Configure your actual observability backend in `deployments/otel-collector.yaml` before sustained use.
+The supplied Compose stack exposes one application origin on port 8080 for local and Tailscale access. Traefik routes `/identity` to the private Keycloak service and all other paths to the private platform service, so users never leave the Forma hostname. PostgreSQL, the Python worker, Consul, and the OpenTelemetry Collector remain private or loopback-bound. The collector exports all three signals to its local debug output for inspection. Configure your actual observability backend in `deployments/otel-collector.yaml` before sustained use.
+
+Keycloak bootstraps its built-in `master` realm and imports the declarative `app-builder` realm whenever its database is new. The realm contains the confidential `app-builder` client, workflow roles, and the `brian` editor account. Run `make configure` to generate all passwords and the client secret; retrieve the local user password with `awk -F= '$1 == "KEYCLOAK_BRIAN_PASSWORD" {print $2}' .env`.
 
 ## Build and inspect
 
@@ -33,7 +35,7 @@ No automated tests have been added; the repository owner's approval is required 
 
 - Select a node, then use **Inputs & resources** to select existing sources or add a model, memory, MCP, credential, or configuration component.
 - Use **Configure** and **Used by** to move between a resource and its consumer.
-- Multiple tool sources are supported by agent plugin version 1.1.0; existing versions remain pinned until explicitly upgraded.
+- Multiple tool sources are supported by the installed agent plugin. During development, the registry mirrors the packages on disk and removes superseded versions.
 - For incoming requests, add **Inbound webhook**, create its **Test endpoint**, and choose **Copy curl command**. Publish before creating its **Live endpoint**.
 - Test requests appear in **Runs** and in the trigger's received-request status.
 

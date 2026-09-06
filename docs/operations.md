@@ -18,7 +18,11 @@ TLS verification is enabled by HTTP clients. Mount your enterprise CA bundle int
 
 ## Keycloak
 
-Configure these environment variables on the platform:
+The Compose deployment runs Keycloak 26.7.3 with a dedicated PostgreSQL database. Traefik exposes it only through the application's `/identity` path; Keycloak has no published host port. Its built-in `master` realm receives the generated bootstrap administrator. The declarative `deployments/keycloak/app-builder-realm.json` import creates the application realm, OIDC client, Forma login theme, roles, and `brian` editor account whenever the Keycloak database is new. Startup import skips an existing realm, preserving runtime changes across ordinary restarts.
+
+`scripts/configure.py` detects the local Tailscale MagicDNS hostname and stores it as `APP_PUBLIC_HOST`. It also generates independent Keycloak database, bootstrap administrator, OIDC client, and `brian` passwords. Existing `.env` values are retained and only missing settings are appended.
+
+The platform receives these OIDC settings from Compose:
 
 - `APP__OIDC__ISSUER`: externally reachable realm issuer.
 - `APP__OIDC__CLIENT_ID`: registered client ID.
@@ -26,9 +30,9 @@ Configure these environment variables on the platform:
 - `APP__OIDC__REDIRECT_URL`: public origin plus `/auth/callback`.
 - `APP__SECURITY__SECURE_COOKIES=true` when served through HTTPS.
 
-Create realm roles `workflow-admin`, `workflow-editor`, `workflow-viewer` and include them in ID-token `realm_access.roles`. Authorization uses BAccess predicates. Login uses OIDC verification and PKCE; state is bound to an encrypted, short-lived HTTP-only cookie. Sessions expire after eight hours. The local operator bearer token remains an administrative API credential when configured; remove it if only OIDC authentication should be permitted.
+Realm roles `workflow-admin`, `workflow-editor`, and `workflow-viewer` are included in ID-token `realm_access.roles`. Authorization uses BAccess predicates. Login uses OIDC verification and PKCE; state is bound to an encrypted, short-lived HTTP-only cookie. Sessions expire after eight hours. The local operator bearer token remains an administrative API credential when configured; remove it if only OIDC authentication should be permitted.
 
-The default stack is loopback-only. For shared deployment, configure your Traefik/TLS routing, trusted OIDC origin, secure cookies, network policy, collector backend, backups, and secret delivery. No public deployment is performed by this repository's local setup.
+Traefik binds the single application port to all host interfaces for Tailscale access; the platform, Keycloak, databases, worker, Consul, and collector remain private or loopback-bound. Tailscale provides encrypted transport for this local HTTP deployment. For access outside the tailnet, configure Traefik with TLS, secure cookies, a trusted OIDC origin, network policy, collector backend, backups, and production secret delivery.
 
 ## Telemetry
 

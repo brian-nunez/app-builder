@@ -28,11 +28,6 @@ export function InputBindings({
   if (!manifest.inputs.length) return null;
   return (
     <section className="input-bindings">
-      <h3>Inputs & resources</h3>
-      <p>
-        Choose an existing node or add a compatible component. Each input has
-        its own connection.
-      </p>
       {manifest.inputs.map((input) => {
         const connections = edges.filter(
           (e) => e.target === nodeId && e.targetHandle === input.name,
@@ -56,18 +51,14 @@ export function InputBindings({
             <div className="input-heading">
               <label htmlFor={`bind-${nodeId}-${input.name}`}>
                 {input.title}
-                {input.required ? ' *' : ' (optional)'}
+                {input.required && <em>Required</em>}
               </label>
-              <span>
-                {input.multiple
-                  ? 'Multiple sources'
-                  : input.kind === 'resource'
-                    ? 'Resource'
-                    : 'Value'}
+              <span className={`port-kind ${input.kind}`}>
+                {input.multiple ? 'Multiple' : input.kind === 'resource' ? 'Resource' : 'Data'}
               </span>
             </div>
             {suppliedByTrigger ? (
-              <p>Provided by incoming requests or the Run input.</p>
+              <div className="binding-provided">Provided by each incoming request or manual run.</div>
             ) : (
               <>
                 <select
@@ -91,7 +82,9 @@ export function InputBindings({
                   <option value="">
                     {input.multiple
                       ? 'Add a source…'
-                      : `Select ${input.title.toLowerCase()}…`}
+                      : connections.length
+                        ? 'Change source…'
+                        : `Choose ${input.title.toLowerCase()}…`}
                   </option>
                   {sources.length > 0 && (
                     <optgroup label="Existing nodes">
@@ -126,12 +119,15 @@ export function InputBindings({
                 </select>
                 {connections.map((edge) => (
                   <div className="binding-source" key={edge.id}>
-                    <button type="button" onClick={() => onSelect(edge.source)}>
-                      Configure{' '}
-                      {nodes.find((n) => n.id === edge.source)?.data.definition
-                        .name ?? 'source'}
+                    <button className="binding-name" type="button" onClick={() => onSelect(edge.source)}>
+                      <span className="binding-dot" />
+                      <span>
+                        {nodes.find((n) => n.id === edge.source)?.data.definition.name ?? 'Source'}
+                        <small>{edge.sourceHandle}</small>
+                      </span>
                     </button>
                     <button
+                      className="disconnect-button"
                       type="button"
                       aria-label={`Disconnect ${input.title} from ${nodes.find((n) => n.id === edge.source)?.data.definition.name}`}
                       onClick={() => onUnbind(edge.id)}
@@ -141,7 +137,7 @@ export function InputBindings({
                   </div>
                 ))}
                 {input.required && connections.length === 0 && (
-                  <small>Required before this workflow can run.</small>
+                  <small className="binding-warning">Connect a source before running this workflow.</small>
                 )}
               </>
             )}

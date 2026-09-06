@@ -12,6 +12,7 @@
       "pointer": {
         "type": "string",
         "title": "JSON Pointer",
+        "description": "RFC 6901 path such as /customer/email. Leave blank for the full document.",
         "default": "",
         "pattern": "^($|/)"
       }
@@ -53,5 +54,5 @@
       "description": "Successfully resolved JSON fields"
     }
   ],
-  "digest": "454aeae18d84ec732eaed8659034adcd8ce588bdd1af0e18d94a582a35a67542"
+  "digest": "5de9bb2b74130eef9964df860e1fba2d4dfba891e7ce35d26504e8519c40461a"
 }

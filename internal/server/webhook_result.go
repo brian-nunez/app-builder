@@ -26,7 +26,7 @@ func (s *Server) hookResult(w http.ResponseWriter, r *http.Request) {
 func (s *Server) sendHookResult(w http.ResponseWriter, r *http.Request, runID, workflowID string, wait bool) {
 	w.Header().Set("Cache-Control", "no-store")
 	location := "/hooks/" + r.PathValue("id") + "/runs/" + runID
-	deadline := time.NewTimer(50 * time.Second)
+	deadline := time.NewTimer(90 * time.Second)
 	defer deadline.Stop()
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()

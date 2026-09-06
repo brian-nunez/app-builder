@@ -130,7 +130,11 @@ func ValidateGraph(g plugin.Graph, catalog map[string]plugin.Manifest, complete 
 	}
 	if complete {
 		for _, n := range g.Nodes {
-			for _, p := range catalog[n.Plugin+"@"+n.Version].Inputs {
+			manifest := catalog[n.Plugin+"@"+n.Version]
+			for _, p := range manifest.Inputs {
+				if manifest.Kind == "trigger" && p.Name == "event" {
+					continue
+				}
 				if p.Required && !bound[n.ID+":"+p.Name] {
 					return nil, fmt.Errorf("%s requires input %s", n.Name, p.Title)
 				}

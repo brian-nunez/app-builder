@@ -20,7 +20,7 @@ The local `Configuration check` workflow and its history remain available for in
 
 Not yet verified against real services:
 
-- Organization-specific Keycloak realm/client configuration.
+- Keycloak browser login and role enforcement from a second Tailscale device.
 - On-premises One Data/OpenAPI services and their authentication requirements.
 - Real Vault/Consul endpoints and enterprise certificates.
 - Real model/MCP endpoints and an independently provisioned PostgreSQL memory database.

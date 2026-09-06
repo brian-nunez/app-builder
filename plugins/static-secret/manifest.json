@@ -12,6 +12,7 @@
       "value": {
         "type": "string",
         "title": "Secret value",
+        "description": "Credential stored encrypted and supplied only to sensitive inputs.",
         "default": "",
         "writeOnly": true
       }
@@ -37,5 +38,5 @@
   "permissions": [],
   "logFields": [],
   "metrics": [],
-  "digest": "26300c25cf441ff3df3f89f8e1bd3c5ce032ccc5e956222e88561d6229c43cc2"
+  "digest": "efff6d129cbba12b756507f00a3108c91a836c4ab5a4ae710456a29dd8b1b640"
 }

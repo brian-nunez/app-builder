@@ -11,10 +11,14 @@
     "properties": {
       "url": {
         "type": "string",
+        "title": "MCP server URL",
+        "description": "Streamable HTTP endpoint for the MCP server.",
         "default": "https://mcp.internal/mcp"
       },
       "server_name": {
         "type": "string",
+        "title": "Server name",
+        "description": "Short label used to namespace tools from this server.",
         "default": "tools"
       }
     },
@@ -54,5 +58,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "2d900238874e43b5afb2d73b4e8933b3be79ddbd03a47aabc5cb8c66e57eebfb"
+  "digest": "ec267ce13a08de277602a9eb5457b421b59bc36daf2f60229bffcd227eb68717"
 }

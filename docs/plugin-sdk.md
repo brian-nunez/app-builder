@@ -4,7 +4,7 @@ The application contains no integration registry switch, provider list, or provi
 
 ## Package lifecycle
 
-A plugin directory contains `manifest.json`, `plugin.py`, and optional immutable supporting files. The package name is namespaced, such as `team.customer-lookup`. The version is an exact `major.minor.patch`. Directories may use any name, so `customer-lookup-1.0.0` and `customer-lookup-2.0.0` can coexist. Install both into platform and worker images. Never replace a registered name/version with different contents.
+A plugin directory contains `manifest.json`, `plugin.py`, and optional supporting files. The package name is namespaced, such as `team.customer-lookup`, and the version is an exact `major.minor.patch`. During development, the database catalog mirrors the packages installed on disk: changed manifests are refreshed and removed packages are purged at startup.
 
 1. Run `uv run --project python workflow-plugin new team.customer-lookup` from the repository root.
 2. Implement `async execute(ctx)` and declare its configuration, inputs, outputs, diagnostics, permissions, and custom metrics in the manifest.
@@ -117,7 +117,7 @@ Use `community.static-secret` to enter a credential directly. Its manifest marks
 
 Every input now has a source picker in **Inputs & resources**. It lists compatible output ports on existing nodes and compatible installed plugins to add. Selecting a new provider creates the node and connection together. **Configure** opens its settings; **Used by** returns to the consumer. The canvas also supports dragging between enlarged handles and a node selector for keyboard navigation.
 
-A port may declare `multiple: true`. The engine then supplies an ordered array of values, ordered by saved edges, validating every item against that port's `schema`. Ports without this flag accept one source; selecting a replacement replaces only that input's connection. Duplicate edges and cycles are rejected. `community.langchain-agent@1.1.0` accepts multiple tool resources and combines their tool lists. Version 1.0.0 remains available for existing workflow history; the version picker makes upgrades explicit.
+A port may declare `multiple: true`. The engine then supplies an ordered array of values, ordered by saved edges, validating every item against that port's `schema`. Ports without this flag accept one source; selecting a replacement replaces only that input's connection. Duplicate edges and cycles are rejected. The current `community.langchain-agent` accepts multiple tool resources and combines their tool lists.
 
 ## Incoming webhook controls
 

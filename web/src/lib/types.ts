@@ -7,6 +7,12 @@ export type Schema = {
   enum?: string[];
   minimum?: number;
   maximum?: number;
+  minLength?: number;
+  pattern?: string;
+  format?: string;
+  items?: Schema;
+  minItems?: number;
+  uniqueItems?: boolean;
   properties?: Record<string, Schema>;
   required?: string[];
 };
@@ -79,6 +85,10 @@ export type Run = {
   error: string | null;
   createdAt: string;
   finishedAt: string | null;
+};
+export type RunDetail = Run & {
+  input: unknown;
+  output: unknown;
 };
 export type Step = {
   nodeId: string;

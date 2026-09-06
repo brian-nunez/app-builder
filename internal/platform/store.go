@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/brian-nunez/app-builder/sdk/go/plugin"
 	"github.com/brian-nunez/bdb"
 	"github.com/google/uuid"
@@ -78,28 +77,8 @@ func (s *Store) Register(ctx context.Context, m plugin.Manifest) error {
 	if err := compileManifest(m); err != nil {
 		return err
 	}
-	result, err := s.DB.Exec(ctx, "INSERT INTO plugin_versions(name,version,manifest) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", m.Name, m.Version, string(JSON(m)))
-	if err != nil {
-		return err
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		var existing []byte
-		if err = s.DB.QueryOne(ctx, "SELECT manifest FROM plugin_versions WHERE name=$1 AND version=$2", []any{m.Name, m.Version}, &existing); err != nil {
-			return err
-		}
-		var old plugin.Manifest
-		if err = json.Unmarshal(existing, &old); err != nil {
-			return err
-		}
-		if string(JSON(old)) != string(JSON(m)) {
-			return fmt.Errorf("plugin %s@%s changed without a version increment", m.Name, m.Version)
-		}
-	}
-	return nil
+	_, err := s.DB.Exec(ctx, "INSERT INTO plugin_versions(name,version,manifest) VALUES($1,$2,$3) ON CONFLICT(name,version) DO UPDATE SET manifest=EXCLUDED.manifest,created_at=now()", m.Name, m.Version, string(JSON(m)))
+	return err
 }
 func (s *Store) List(ctx context.Context) ([]Workflow, error) {
 	rows, err := s.DB.Query(ctx, "SELECT id,name,head,published,updated_at::text FROM workflows ORDER BY updated_at DESC")
@@ -227,6 +206,12 @@ type Run struct {
 	TraceParent string  `json:"-"`
 }
 
+type RunDetail struct {
+	Run
+	Input  any `json:"input"`
+	Output any `json:"output"`
+}
+
 func (s *Store) Enqueue(ctx context.Context, id string, revision int, input any, key, traceparent string) (string, error) {
 	runID := uuid.NewString()
 	sealed, err := s.Cipher.Seal(input, id)
@@ -255,6 +240,58 @@ func (s *Store) Runs(ctx context.Context, id string) ([]Run, error) {
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+func (s *Store) RunDetail(ctx context.Context, id string) (RunDetail, error) {
+	var detail RunDetail
+	var input, output []byte
+	err := s.DB.QueryOne(ctx, "SELECT id,workflow_id,revision,status,attempt,error,created_at::text,finished_at::text,input,output FROM runs WHERE id=$1", []any{id}, &detail.ID, &detail.WorkflowID, &detail.Revision, &detail.Status, &detail.Attempt, &detail.Error, &detail.CreatedAt, &detail.FinishedAt, &input, &output)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	if err = s.Cipher.Open(input, detail.WorkflowID, &detail.Input); err != nil {
+		return RunDetail{}, err
+	}
+	if len(output) > 0 {
+		if err = s.Cipher.Open(output, detail.ID, &detail.Output); err != nil {
+			return RunDetail{}, err
+		}
+	}
+	return detail, nil
+}
+
+func (s *Store) DeleteWorkflow(ctx context.Context, id string) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "DELETE FROM steps WHERE run_id IN (SELECT id FROM runs WHERE workflow_id=$1)", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM trigger_bindings WHERE workflow_id=$1", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM runs WHERE workflow_id=$1", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM revisions WHERE workflow_id=$1", id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM audit_events WHERE workflow_id=$1", id); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, "DELETE FROM workflows WHERE id=$1", id)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return sql.ErrNoRows
+	}
+	return tx.Commit()
 }
 func (s *Store) Claim(ctx context.Context) (Run, error) {
 	var r Run

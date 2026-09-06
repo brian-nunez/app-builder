@@ -11,6 +11,8 @@
     "properties": {
       "url": {
         "type": "string",
+        "title": "Destination URL",
+        "description": "HTTPS endpoint that receives the JSON body.",
         "default": "https://service.internal/events"
       }
     },
@@ -64,5 +66,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "220ee1668d00a09a21ecdf7faeb3ae8d0695dc3f41e48322edff0347ccb032a8"
+  "digest": "6a2f021dc563ccd6504a4277f90c2d8bcf4d017fdb0c4ef511a5eab9e9be2047"
 }

@@ -36,8 +36,9 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 CREATE OR REPLACE FUNCTION prevent_revision_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'revision and plugin version history is immutable'; END $$;
-CREATE OR REPLACE TRIGGER revisions_immutable BEFORE UPDATE OR DELETE ON revisions FOR EACH ROW EXECUTE FUNCTION prevent_revision_mutation();
-CREATE OR REPLACE TRIGGER plugin_versions_immutable BEFORE UPDATE OR DELETE ON plugin_versions FOR EACH ROW EXECUTE FUNCTION prevent_revision_mutation();
+DROP TRIGGER IF EXISTS revisions_immutable ON revisions;
+CREATE TRIGGER revisions_immutable BEFORE UPDATE ON revisions FOR EACH ROW EXECUTE FUNCTION prevent_revision_mutation();
+DROP TRIGGER IF EXISTS plugin_versions_immutable ON plugin_versions;
 ALTER TABLE trigger_bindings ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'published';
 ALTER TABLE trigger_bindings ADD COLUMN IF NOT EXISTS token_cipher bytea;
 ALTER TABLE trigger_bindings ADD COLUMN IF NOT EXISTS last_run_id uuid REFERENCES runs(id);

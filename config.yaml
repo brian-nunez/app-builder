@@ -1,5 +1,5 @@
 server:
-  address: '127.0.0.1:8080'
+  address: '0.0.0.0:8080'
   assets: 'web/dist'
 db:
   enabled: true
@@ -25,6 +25,11 @@ telemetry:
   otlp_insecure: true
 security:
   secure_cookies: false
+oidc:
+  issuer: ''
+  client_id: ''
+  client_secret: ''
+  redirect_url: ''
 plugins:
   directory: plugins
 worker:

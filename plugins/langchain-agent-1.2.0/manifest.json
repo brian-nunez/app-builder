@@ -11,14 +11,20 @@
     "properties": {
       "system_prompt": {
         "type": "string",
+        "title": "System prompt",
+        "description": "Base instructions used when the system prompt input is not connected.",
         "default": "You are a helpful assistant."
       },
       "thread_id": {
         "type": "string",
+        "title": "Default thread ID",
+        "description": "Stable conversation ID. Leave blank to use the run ID.",
         "default": ""
       },
       "recursion_limit": {
         "type": "integer",
+        "title": "Recursion limit",
+        "description": "Maximum agent graph steps allowed for one invocation.",
         "minimum": 1,
         "maximum": 100,
         "default": 25
@@ -133,5 +139,5 @@
       "description": "Messages produced or consumed by an agent invocation"
     }
   ],
-  "digest": "ca6a74751e970c14f255eccd0f2804eeeac4d912d70de618a61013a6c38345c8"
+  "digest": "38b33c99dd384b66cd40172dc7d54c85c6016949b73363c6941888a2fdc975a1"
 }

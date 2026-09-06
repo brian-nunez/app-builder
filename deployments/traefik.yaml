@@ -1,0 +1,16 @@
+entryPoints:
+  web:
+    address: ':8080'
+  management:
+    address: ':8082'
+providers:
+  file:
+    filename: /etc/traefik/routes.yaml
+    watch: true
+ping:
+  entryPoint: management
+log:
+  format: json
+  level: INFO
+accessLog:
+  format: json

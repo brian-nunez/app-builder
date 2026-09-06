@@ -25,6 +25,7 @@ import {
   Circle,
   Clock3,
   Code2,
+  Ellipsis,
   GitBranch,
   History,
   Layers3,
@@ -32,9 +33,11 @@ import {
   LogOut,
   Play,
   Plus,
+  Pencil,
   Radio,
   Search,
   ShieldCheck,
+  Trash2,
   Workflow as WorkflowIcon,
   X,
 } from 'lucide-react';
@@ -43,6 +46,7 @@ import type {
   Manifest,
   Revision,
   Run,
+  RunDetail,
   Step,
   Workflow,
   WorkflowNode as Definition,
@@ -54,6 +58,36 @@ import { compatible, latestPlugins, portSide } from './lib/connections';
 
 const nodeTypes = { plugin: WorkflowNode };
 const emptyGraph = { nodes: [], edges: [] };
+const configDefaults = (manifest: Manifest) =>
+  Object.fromEntries(
+    Object.entries(manifest.configSchema.properties ?? {}).map(([key, value]) => [
+      key,
+      value.default ??
+        (value.type === 'string'
+          ? ''
+          : value.type === 'boolean'
+            ? false
+            : value.type === 'object'
+              ? {}
+              : value.type === 'array'
+                ? []
+                : null),
+    ]),
+  );
+const unavailableManifest = (definition: Definition): Manifest => ({
+  protocol: 'workflow.plugin/v1',
+  name: definition.plugin,
+  version: definition.version,
+  title: 'Unavailable plugin',
+  description: 'This plugin is not installed. Replace or remove this node.',
+  category: 'Unavailable',
+  kind: 'action',
+  configSchema: { type: 'object', properties: {} },
+  inputs: [],
+  outputs: [],
+  permissions: [],
+  digest: '',
+});
 const relative = (value: string) =>
   new Date(value).toLocaleString(undefined, {
     month: 'short',
@@ -138,12 +172,16 @@ export default function App() {
   const [history, setHistory] = useState<Revision[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
+  const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
+  const [runTab, setRunTab] = useState<'input' | 'output' | 'steps'>('output');
   const [activeRun, setActiveRun] = useState<string | null>(null);
   const [saveState, setSaveState] = useState('Saved');
   const [error, setError] = useState('');
-  const [modal, setModal] = useState<'create' | 'run' | null>(null);
+  const [modal, setModal] = useState<'create' | 'run' | 'add' | 'rename' | 'delete' | null>(null);
   const [name, setName] = useState('');
   const [runInput, setRunInput] = useState('{}');
+  const [actionWorkflow, setActionWorkflow] = useState<Workflow | null>(null);
+  const [workflowMenu, setWorkflowMenu] = useState<string | null>(null);
 
   const dirty = useRef(false);
   const saveBlocked = useRef(false);
@@ -177,20 +215,30 @@ export default function App() {
   const install = useCallback(
     (item: Workflow) => {
       generation.current++;
-      dirty.current = false;
+      let upgraded = false;
       saveBlocked.current = false;
       workflowRef.current = item;
       setWorkflow(item);
       const nextNodes: CanvasNode[] = (item.graph.nodes ?? []).map(
-        (definition) => ({
-          id: definition.id,
-          type: 'plugin',
-          position: definition.position,
-          data: {
-            definition,
-            manifest: catalog[`${definition.plugin}@${definition.version}`],
-          },
-        }),
+        (definition) => {
+          const exact = catalog[`${definition.plugin}@${definition.version}`];
+          const replacement = exact ?? latestPlugins(catalog).find((manifest) => manifest.name === definition.plugin);
+          const manifest = replacement ?? unavailableManifest(definition);
+          const nextDefinition = replacement && !exact
+            ? {
+                ...definition,
+                version: replacement.version,
+                config: { ...configDefaults(replacement), ...definition.config },
+              }
+            : definition;
+          if (replacement && !exact) upgraded = true;
+          return {
+            id: nextDefinition.id,
+            type: 'plugin',
+            position: nextDefinition.position,
+            data: { definition: nextDefinition, manifest },
+          };
+        },
       );
       const nextEdges = (item.graph.edges ?? []).map((e) => ({
         id: e.id,
@@ -201,11 +249,12 @@ export default function App() {
         type: 'smoothstep',
       }));
       graphRef.current = { nodes: nextNodes, edges: nextEdges };
+      dirty.current = upgraded;
       setNodes(nextNodes);
       setEdges(nextEdges);
       setSelected(null);
-      setSaveState('Saved');
-      setError('');
+      setSaveState(upgraded ? 'Upgrading plugins…' : 'Saved');
+      setError(upgraded ? 'Older plugin versions were upgraded to the installed versions. The workflow will be saved as a new revision.' : '');
     },
     [catalog],
   );
@@ -280,8 +329,14 @@ export default function App() {
           const result = await api<Run[]>(`/api/workflows/${workflow.id}/runs`);
           if (!stale) setRuns(result);
           if (activeRun) {
-            const result = await api<Step[]>(`/api/runs/${activeRun}/steps`);
-            if (!stale) setSteps(result);
+            const [stepResult, detailResult] = await Promise.all([
+              api<Step[]>(`/api/runs/${activeRun}/steps`),
+              api<RunDetail>(`/api/runs/${activeRun}`),
+            ]);
+            if (!stale) {
+              setSteps(stepResult);
+              setRunDetail(detailResult);
+            }
           }
         }
       } catch (error) {
@@ -446,21 +501,7 @@ export default function App() {
     target?: { nodeId: string; input: string; output: string },
   ) => {
     const id = crypto.randomUUID();
-    const config = Object.fromEntries(
-      Object.entries(manifest.configSchema.properties ?? {}).map(
-        ([key, value]) => [
-          key,
-          value.default ??
-            (value.type === 'string'
-              ? ''
-              : value.type === 'boolean'
-                ? false
-                : value.type === 'object'
-                  ? {}
-                  : null),
-        ],
-      ),
-    );
+    const config = configDefaults(manifest);
     const consumer = target ? graphRef.current.nodes.find((n) => n.id === target.nodeId) : undefined;
     const input = consumer?.data.manifest.inputs.find((p) => p.name === target?.input);
     const side = input ? portSide(input, 'input') : 'left';
@@ -512,6 +553,8 @@ export default function App() {
         : graphRef.current.edges,
     );
     setSelected(id);
+    setModal(null);
+    setQuery('');
     requestAnimationFrame(() =>
       requestAnimationFrame(() =>
         flowRef.current?.setCenter(
@@ -572,6 +615,17 @@ export default function App() {
     } catch (error) {
       onError(error);
     }
+  };
+  const openRename = (item: Workflow) => {
+    setActionWorkflow(item);
+    setName(item.name);
+    setWorkflowMenu(null);
+    setModal('rename');
+  };
+  const openDelete = (item: Workflow) => {
+    setActionWorkflow(item);
+    setWorkflowMenu(null);
+    setModal('delete');
   };
   if (authenticated === null)
     return (
@@ -745,12 +799,9 @@ export default function App() {
                       w.name.toLowerCase().includes(query.toLowerCase()),
                     )
                     .map((w) => (
-                      <button
-                        className="workflow-row"
-                        key={w.id}
-                        onClick={() => void open(w.id)}
-                      >
-                        <span className="workflow-name">
+                      <div className="workflow-row" key={w.id}>
+                        <button className="workflow-open" onClick={() => void open(w.id)}>
+                          <span className="workflow-name">
                           <span className="workflow-list-icon">
                             <WorkflowIcon size={20} />
                           </span>
@@ -758,20 +809,29 @@ export default function App() {
                             <strong>{w.name}</strong>
                             <small>{w.id.slice(0, 8)}</small>
                           </span>
-                        </span>
-                        <span
+                          </span>
+                          <span
                           className={`status ${w.published ? 'published' : ''}`}
-                        >
+                          >
                           <Circle size={6} fill="currentColor" />
                           {w.published ? 'Published' : 'Draft'}
-                        </span>
-                        <span className="revision-cell">
+                          </span>
+                          <span className="revision-cell">
                           <GitBranch size={13} />
                           Revision {w.head}
-                        </span>
-                        <span className="muted">{relative(w.updatedAt)}</span>
-                        <ChevronRight size={17} />
-                      </button>
+                          </span>
+                          <span className="muted">{relative(w.updatedAt)}</span>
+                        </button>
+                        <div className="workflow-actions">
+                          <button className="icon-button" aria-label={`Actions for ${w.name}`} onClick={() => setWorkflowMenu(workflowMenu === w.id ? null : w.id)}><Ellipsis size={18} /></button>
+                          {workflowMenu === w.id && (
+                            <div className="action-menu">
+                              <button onClick={() => openRename(w)}><Pencil size={14} />Rename</button>
+                              <button className="danger" onClick={() => openDelete(w)}><Trash2 size={14} />Delete</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     ))}
                 </div>
                 {workflows.length === 0 && (
@@ -875,7 +935,9 @@ export default function App() {
                 <ArrowLeft size={18} />
               </button>
               <div className="editor-name">
-                <strong>{workflow.name}</strong>
+                <button className="editable-title" onClick={() => openRename(workflow)} title="Rename workflow">
+                  <strong>{workflow.name}</strong><Pencil size={12} />
+                </button>
                 <span className="status">
                   {workflow.published === workflow.head ? 'Published' : 'Draft'}
                 </span>
@@ -891,6 +953,16 @@ export default function App() {
                 {saveState}
               </span>
               <div className="toolbar-actions">
+                <button
+                  className="button add-component-button"
+                  onClick={() => {
+                    setQuery('');
+                    setModal('add');
+                  }}
+                >
+                  <Plus size={15} />
+                  Add component
+                </button>
                 <button
                   className={`button quiet ${panel === 'history' ? 'chosen' : ''}`}
                   onClick={() =>
@@ -1043,6 +1115,11 @@ export default function App() {
                   onConnect={connect}
                   onNodeClick={(_, n) => setSelected(n.id)}
                   onPaneClick={() => setSelected(null)}
+                  onPaneContextMenu={(event) => {
+                    event.preventDefault();
+                    setQuery('');
+                    setModal('add');
+                  }}
                   fitView
                   fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
                   minZoom={0.25}
@@ -1282,6 +1359,8 @@ export default function App() {
                               onClick={() => {
                                 setActiveRun(run.id);
                                 setSteps([]);
+                                setRunDetail(null);
+                                setRunTab('output');
                               }}
                             >
                               <span className={`status ${run.status}`}>
@@ -1311,27 +1390,43 @@ export default function App() {
                         ))
                       )}
                     </div>
-                    <div className="step-list">
+                    <div className="run-detail">
                       {activeRun ? (
-                        steps.map((step) => (
-                          <div key={step.nodeId + step.attempt}>
-                            <span className={`status ${step.status}`}>
-                              {step.status}
-                            </span>
-                            <strong>
-                              {nodes.find((n) => n.id === step.nodeId)?.data
-                                .definition.name ?? step.nodeId}
-                            </strong>
-                            <small>
-                              {step.error ?? `Attempt ${step.attempt}`}
-                            </small>
+                        <>
+                          <div className="run-detail-header">
+                            <div>
+                              <strong>{runDetail ? `Run ${runDetail.id.slice(0, 8)}` : 'Loading run…'}</strong>
+                              {runDetail && <small>Revision {runDetail.revision} · attempt {runDetail.attempt}</small>}
+                            </div>
+                            {runDetail && <span className={`status ${runDetail.status}`}>{runDetail.status}</span>}
                           </div>
-                        ))
-                      ) : (
-                        <p className="panel-empty">
-                          Select a run to inspect its steps.
-                        </p>
-                      )}
+                          <div className="run-tabs">
+                            <button className={runTab === 'input' ? 'active' : ''} onClick={() => setRunTab('input')}>Input</button>
+                            <button className={runTab === 'output' ? 'active' : ''} onClick={() => setRunTab('output')}>Output</button>
+                            <button className={runTab === 'steps' ? 'active' : ''} onClick={() => setRunTab('steps')}>Steps <span>{steps.length}</span></button>
+                          </div>
+                          {runTab === 'steps' ? (
+                            <div className="step-list">
+                              {steps.map((step) => (
+                                <div key={step.nodeId + step.attempt}>
+                                  <span className={`status ${step.status}`}>{step.status}</span>
+                                  <strong>{nodes.find((n) => n.id === step.nodeId)?.data.definition.name ?? step.nodeId}</strong>
+                                  <small>{step.error ?? `Attempt ${step.attempt}`}</small>
+                                </div>
+                              ))}
+                              {!steps.length && <p className="panel-empty">No steps have started yet.</p>}
+                            </div>
+                          ) : (
+                            <div className="payload-viewer">
+                              <div className="payload-heading">
+                                <span>{runTab === 'input' ? 'Trigger input' : 'Workflow output'}</span>
+                                <button onClick={() => void navigator.clipboard.writeText(JSON.stringify(runTab === 'input' ? runDetail?.input : runDetail?.output, null, 2))}>Copy JSON</button>
+                              </div>
+                              <pre>{JSON.stringify(runTab === 'input' ? runDetail?.input : runDetail?.output, null, 2) ?? (runDetail?.status === 'running' ? 'Waiting for output…' : 'No output')}</pre>
+                            </div>
+                          )}
+                        </>
+                      ) : <p className="panel-empty">Select a run to inspect its input, output, and steps.</p>}
                     </div>
                   </div>
                 )}
@@ -1351,7 +1446,11 @@ export default function App() {
                 ? 'Create workflow'
                 : modal === 'run'
                   ? 'Run workflow'
-                  : 'Webhook binding'
+                  : modal === 'add'
+                    ? 'Add component'
+                    : modal === 'rename'
+                      ? 'Rename workflow'
+                      : 'Delete workflow'
             }
           >
             <button
@@ -1399,6 +1498,73 @@ export default function App() {
                   <ArrowUpRight size={16} />
                 </button>
               </form>
+            ) : modal === 'add' ? (
+              <div className="add-dialog">
+                <span className="eyebrow">COMPONENT LIBRARY</span>
+                <h2>Add to {workflow?.name}</h2>
+                <p>Search by capability, then choose a component. It will be selected and ready to configure.</p>
+                <label className="modal-search">
+                  <Search size={17} />
+                  <input autoFocus placeholder="Search actions, resources, and triggers…" value={query} onChange={(e) => setQuery(e.target.value)} />
+                </label>
+                <div className="add-component-list">
+                  {filtered.map((item) => (
+                    <button key={`${item.name}@${item.version}`} onClick={() => add(item)}>
+                      <span className={`node-symbol ${item.kind}`}><Box size={18} /></span>
+                      <span><strong>{item.title}</strong><small>{item.description}</small></span>
+                      <span className="port-kind">{item.kind}</span>
+                      <Plus size={16} />
+                    </button>
+                  ))}
+                  {!filtered.length && <div className="quiet-state">No components match “{query}”.</div>}
+                </div>
+              </div>
+            ) : modal === 'rename' ? (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!actionWorkflow) return;
+                try {
+                  if (workflowRef.current?.id === actionWorkflow.id) {
+                    const updated = { ...workflowRef.current, name: name.trim() };
+                    workflowRef.current = updated;
+                    setWorkflow(updated);
+                    dirty.current = true;
+                    saveBlocked.current = false;
+                    setSaveState('Unsaved changes');
+                  } else {
+                    const current = await api<Workflow>(`/api/workflows/${actionWorkflow.id}`);
+                    await api<Workflow>(`/api/workflows/${actionWorkflow.id}`, 'PUT', { name: name.trim(), base: current.head, graph: current.graph, message: 'Renamed workflow' });
+                    await refresh();
+                  }
+                  setModal(null);
+                  setActionWorkflow(null);
+                } catch (error) { onError(error); }
+              }}>
+                <span className="eyebrow">WORKFLOW DETAILS</span>
+                <h2>Rename workflow</h2>
+                <p>Use a short name that describes the outcome of this automation.</p>
+                <label className="field"><span>Workflow name</span><input autoFocus required maxLength={160} value={name} onChange={(e) => setName(e.target.value)} /></label>
+                <button className="button primary full">Save name</button>
+              </form>
+            ) : modal === 'delete' ? (
+              <div className="delete-dialog">
+                <span className="danger-icon"><Trash2 size={21} /></span>
+                <span className="eyebrow">DELETE WORKFLOW</span>
+                <h2>Delete “{actionWorkflow?.name}”?</h2>
+                <p>This permanently removes its revisions, runs, webhook endpoints, and execution history.</p>
+                <div className="modal-actions">
+                  <button className="button" onClick={() => setModal(null)}>Cancel</button>
+                  <button className="button danger-button" onClick={async () => {
+                    if (!actionWorkflow) return;
+                    try {
+                      await api(`/api/workflows/${actionWorkflow.id}`, 'DELETE');
+                      setWorkflows((items) => items.filter((item) => item.id !== actionWorkflow.id));
+                      setModal(null);
+                      setActionWorkflow(null);
+                    } catch (error) { onError(error); }
+                  }}>Delete workflow</button>
+                </div>
+              </div>
             ) : modal === 'run' ? (
               <form
                 onSubmit={async (e) => {

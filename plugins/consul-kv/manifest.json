@@ -11,14 +11,20 @@
     "properties": {
       "url": {
         "type": "string",
+        "title": "Consul URL",
+        "description": "Base URL of the Consul HTTP API.",
         "default": "https://consul.internal"
       },
       "key": {
         "type": "string",
+        "title": "Key path",
+        "description": "Consul KV path to read.",
         "default": "services/app/config"
       },
       "parse_json": {
         "type": "boolean",
+        "title": "Parse JSON",
+        "description": "Decode the stored value as JSON instead of returning text.",
         "default": false
       }
     },
@@ -56,5 +62,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "b3536aa809e186f99e709e21b2b89732d87ba6d656a722cfc5afea02df16a0cf"
+  "digest": "ac0177a1a7edaab6cb73a477efad3d450d1307c2a1c248e19d3f7f8b961b34ba"
 }

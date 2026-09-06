@@ -1,0 +1,95 @@
+{
+  "realm": "app-builder",
+  "displayName": "Forma",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "loginTheme": "forma",
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "workflow-admin",
+        "description": "Full workflow administration, including inbound endpoint management"
+      },
+      {
+        "name": "workflow-editor",
+        "description": "Read, edit, publish, and run organization workflows"
+      },
+      {
+        "name": "workflow-viewer",
+        "description": "Read organization workflows"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "app-builder",
+      "name": "App Builder",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://${APP_PUBLIC_HOST}:8080",
+      "baseUrl": "http://${APP_PUBLIC_HOST}:8080/",
+      "adminUrl": "http://${APP_PUBLIC_HOST}:8080/",
+      "redirectUris": [
+        "http://${APP_PUBLIC_HOST}:8080/auth/callback",
+        "http://127.0.0.1:8080/auth/callback",
+        "http://localhost:8080/auth/callback"
+      ],
+      "webOrigins": [
+        "http://${APP_PUBLIC_HOST}:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles in ID token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "brian",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "brian@app-builder.local",
+      "firstName": "Brian",
+      "lastName": "Nunez",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KEYCLOAK_BRIAN_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "workflow-editor"
+      ]
+    }
+  ]
+}

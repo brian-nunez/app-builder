@@ -1,0 +1,21 @@
+http:
+  routers:
+    identity:
+      entryPoints: [web]
+      rule: PathPrefix(`/identity`)
+      priority: 100
+      service: keycloak
+    application:
+      entryPoints: [web]
+      rule: PathPrefix(`/`)
+      priority: 1
+      service: platform
+  services:
+    keycloak:
+      loadBalancer:
+        servers:
+          - url: http://keycloak:8080
+    platform:
+      loadBalancer:
+        servers:
+          - url: http://platform:8080

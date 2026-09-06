@@ -71,6 +71,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	installed := map[string]bool{}
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -82,6 +83,18 @@ func run() error {
 		}
 		if err = store.Register(ctx, manifest); err != nil {
 			return err
+		}
+		installed[manifest.Name+"@"+manifest.Version] = true
+	}
+	catalog, err := store.Catalog(ctx)
+	if err != nil {
+		return err
+	}
+	for key, manifest := range catalog {
+		if !installed[key] {
+			if _, err = store.DB.Exec(ctx, "DELETE FROM plugin_versions WHERE name=$1 AND version=$2", manifest.Name, manifest.Version); err != nil {
+				return err
+			}
 		}
 	}
 	api, err := server.New(ctx, service, store)

@@ -1,6 +1,6 @@
 # Local Gemma and Consul workflow
 
-Open **Local Gemma · Consul agent** in http://127.0.0.1:8080/.
+Open **Local Gemma · Consul agent** at http://127.0.0.1:8080/ locally or `http://<tailscale-ip>:8080/` from another Tailscale device.
 The published workflow has 11 nodes and 12 connections. All integrations remain installed plugins; the platform has no Consul, model, memory, or agent-specific execution logic.
 
 ## Request flow
@@ -44,7 +44,7 @@ Change the system prompt through Consul's KV editor; the next invocation reads i
 - `community.langchain-agent@1.2.0`: optional input ports override configured system prompt and thread ID; `tool_calls` output reports the number of tool calls.
 - `community.openai-model@1.1.0`: optional model input overrides configured model ID.
 - `community.in-memory-checkpoint@1.0.0`: checkpoint exists only within a single agent invocation and is discarded afterward, including when the next request has the same thread ID.
-- `community.http-request-tools@1.1.0`: agent tool restricted to an explicit base URL and allowed HTTP methods. This workflow permits GET and POST to local Consul and HTTP/HTTPS example.com. The `path` tool argument accepts full URLs to the configured `allowed_origins`, or relative paths against `base_url`. Runtime hostname restrictions, response size limits, timeouts, and redirect blocking also apply.
+- `community.http-request-tools@1.3.0`: agent tool restricted to an explicit base URL and allowed HTTP methods. The `path` argument accepts full URLs allowed by the component settings, or relative paths against `base_url`. Runtime hostname restrictions, response size limits, timeouts, and redirect checks also apply.
 
 Existing plugin versions remain available for pinned workflows. Resource resolution and HTTP calls retain SDK OpenTelemetry identity and tracing.
 

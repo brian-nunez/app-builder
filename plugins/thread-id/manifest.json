@@ -11,6 +11,8 @@
     "properties": {
       "field": {
         "type": "string",
+        "title": "Thread ID field",
+        "description": "Input object field to reuse, or populate with a new UUIDv7 when absent.",
         "minLength": 1,
         "default": "thread_id"
       }
@@ -48,5 +50,5 @@
   "permissions": [],
   "logFields": [],
   "metrics": [],
-  "digest": "1db07d2d6af03d9f39d7434a16e1409f7cd643a2592e4f109bc5e58a6a40c127"
+  "digest": "8cf3f5221c10db118e9856d478cae3897f332c3348f92eced4ef66f04ecb5fba"
 }

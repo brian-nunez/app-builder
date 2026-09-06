@@ -12,6 +12,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -51,6 +52,23 @@ func (a *auth) readCookie(r *http.Request, name string, v any) error {
 }
 func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	if a.oauth != nil {
+		callback, err := url.Parse(a.oauth.RedirectURL)
+		if err != nil || callback.Scheme == "" || callback.Host == "" {
+			http.Error(w, "OIDC callback is not configured correctly", http.StatusInternalServerError)
+			return
+		}
+		requestScheme := r.Header.Get("X-Forwarded-Proto")
+		if requestScheme == "" {
+			requestScheme = "http"
+			if r.TLS != nil {
+				requestScheme = "https"
+			}
+		}
+		if !strings.EqualFold(r.Host, callback.Host) || !strings.EqualFold(requestScheme, callback.Scheme) {
+			canonical := &url.URL{Scheme: callback.Scheme, Host: callback.Host, Path: "/auth/login"}
+			http.Redirect(w, r, canonical.String(), http.StatusFound)
+			return
+		}
 		state := randomToken()
 		verifier := oauth2.GenerateVerifier()
 		if err := a.setCookie(w, "login", map[string]any{"state": state, "verifier": verifier, "expires": time.Now().Add(5 * time.Minute).Unix()}, 300); err != nil {

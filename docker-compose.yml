@@ -19,6 +19,83 @@ services:
       retries: 20
     mem_limit: 768m
     cpus: 1.0
+  keycloak-postgres:
+    image: postgres:18.3-alpine3.23
+    user: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run make configure}
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U keycloak -d keycloak']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    cpus: 0.75
+  keycloak:
+    build:
+      context: .
+      dockerfile: deployments/keycloak.Dockerfile
+    restart: unless-stopped
+    command: ['start', '--optimized', '--import-realm']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run make configure}
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-postgres
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run make configure}
+      KC_HOSTNAME: http://${APP_PUBLIC_HOST:?Run make configure}:8080/identity
+      KC_HTTP_RELATIVE_PATH: /identity
+      KC_HTTP_ENABLED: 'true'
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'true'
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?Run make configure}
+      KEYCLOAK_BRIAN_PASSWORD: ${KEYCLOAK_BRIAN_PASSWORD:?Run make configure}
+      APP_PUBLIC_HOST: ${APP_PUBLIC_HOST:?Run make configure}
+    volumes:
+      - ./deployments/keycloak:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', '/bin/bash', '-c', "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /identity/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    security_opt: ['no-new-privileges:true']
+  gateway:
+    image: traefik:v3.7.1
+    restart: unless-stopped
+    command: ['--configFile=/etc/traefik/traefik.yaml']
+    ports:
+      - '0.0.0.0:8080:8080'
+    volumes:
+      - ./deployments/traefik.yaml:/etc/traefik/traefik.yaml:ro
+      - ./deployments/traefik-routes.yaml:/etc/traefik/routes.yaml:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'traefik', 'healthcheck', '--ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 128m
+    cpus: 0.5
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    security_opt: ['no-new-privileges:true']
+    cap_drop: ['ALL']
   collector:
     build:
       context: .
@@ -95,11 +172,14 @@ services:
       APP__SECURITY__ENCRYPTION_KEY: ${PLATFORM_ENCRYPTION_KEY:?Run make configure}
       APP__SECURITY__ACCESS_TOKEN: ${PLATFORM_ACCESS_TOKEN:?Run make configure}
       APP__SECURITY__SECURE_COOKIES: 'false'
+      APP__OIDC__ISSUER: http://${APP_PUBLIC_HOST:?Run make configure}:8080/identity/realms/app-builder
+      APP__OIDC__CLIENT_ID: app-builder
+      APP__OIDC__CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?Run make configure}
+      APP__OIDC__REDIRECT_URL: http://${APP_PUBLIC_HOST:?Run make configure}:8080/auth/callback
       APP__WORKER__ENDPOINT: http://worker:8090
       APP__WORKER__TOKEN: ${WORKER_TOKEN:?Run make configure}
       APP__TELEMETRY__OTLP_ENDPOINT: collector:4317
-    ports:
-      - '127.0.0.1:8080:8080'
+    expose: ['8080']
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +187,12 @@ services:
         condition: service_healthy
       worker:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    extra_hosts:
+      - '${APP_PUBLIC_HOST:?Run make configure}:host-gateway'
     healthcheck:
       test: ['CMD', 'healthcheck', 'http://127.0.0.1:8080/healthz']
       interval: 5s
@@ -120,3 +206,4 @@ services:
 volumes:
   platform_data:
   consul_data:
+  keycloak_postgres_data:

@@ -82,6 +82,13 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 	api.HandleFunc("POST /api/workflows", s.save)
 	api.HandleFunc("PUT /api/workflows/{id}", s.save)
+	api.HandleFunc("DELETE /api/workflows/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if err := s.store.DeleteWorkflow(r.Context(), r.PathValue("id")); err != nil {
+			fail(w, err)
+			return
+		}
+		respond(w, 200, map[string]bool{"ok": true})
+	})
 	api.HandleFunc("GET /api/workflows/{id}", func(w http.ResponseWriter, r *http.Request) {
 		item, err := s.store.Get(r.Context(), r.PathValue("id"))
 		if err != nil {
@@ -110,6 +117,15 @@ func (s *Server) Run(ctx context.Context) error {
 		respond(w, 200, items)
 	})
 	api.HandleFunc("GET /api/runs/{id}/steps", s.steps)
+	api.HandleFunc("GET /api/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		item, err := s.store.RunDetail(r.Context(), r.PathValue("id"))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		respond(w, 200, item)
+	})
 	api.HandleFunc("POST /api/runs/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.Cancel(r.Context(), r.PathValue("id")); err != nil {
 			fail(w, err)
@@ -143,6 +159,11 @@ func (s *Server) Run(ctx context.Context) error {
 			http.ServeFile(w, r, path)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/assets/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
 		http.ServeFile(w, r, filepath.Join(s.assets, "index.html"))
 	})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

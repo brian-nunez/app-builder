@@ -11,14 +11,20 @@
     "properties": {
       "namespace": {
         "type": "string",
+        "title": "Memory namespace",
+        "description": "Logical namespace that separates checkpoint conversations.",
         "default": "default"
       },
       "initialize": {
         "type": "boolean",
+        "title": "Initialize tables",
+        "description": "Create checkpoint tables when the resource opens.",
         "default": false
       },
       "sslmode": {
         "type": "string",
+        "title": "TLS mode",
+        "description": "PostgreSQL sslmode used for the connection.",
         "enum": [
           "verify-full",
           "verify-ca",
@@ -107,5 +113,5 @@
   ],
   "logFields": [],
   "metrics": [],
-  "digest": "d6fe6360773af660cf185fa895bc9e3dbc78d9f20252238018c3255975ec712d"
+  "digest": "d0f4024755714b65969bcd8c9ef63c7d1b3d0936cdb5fe13162ef49611a2dc3e"
 }
